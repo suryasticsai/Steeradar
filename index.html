@@ -1,0 +1,2546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0F1115">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Steeradar — Live Community Rides</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+/* ============================================================
+   STEERADAR — Design Tokens
+   ============================================================ */
+:root {
+  --bg: #0F1115;
+  --bg-2: #14171E;
+  --surface: rgba(26, 30, 40, 0.72);
+  --surface-solid: #1A1E28;
+  --surface-2: #232834;
+  --border: rgba(255,255,255,0.07);
+  --text: #F2F4F8;
+  --text-2: #8B92A3;
+  --text-3: #5A6172;
+  --teal: #00E5C3;
+  --teal-dim: rgba(0,229,195,0.14);
+  --teal-glow: 0 0 20px rgba(0,229,195,0.35);
+  --coral: #FF6B4A;
+  --coral-dim: rgba(255,107,74,0.14);
+  --lime: #A8E063;
+  --radius: 18px;
+  --radius-sm: 12px;
+  --shadow: 0 8px 32px rgba(0,0,0,0.45);
+  --blur: blur(20px);
+  --font: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font);
+  background: #050608;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input, textarea { font-family: inherit; outline: none; }
+a { color: var(--teal); text-decoration: none; }
+
+/* ============================================================
+   App Shell
+   ============================================================ */
+#app {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--bg);
+  overflow: hidden;
+}
+@media (min-width: 481px) {
+  #app {
+    box-shadow: 0 0 80px rgba(0,0,0,0.7);
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+}
+
+/* ============================================================
+   Header
+   ============================================================ */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 10px;
+  padding-top: max(14px, env(safe-area-inset-top));
+  z-index: 50;
+  position: relative;
+  flex-shrink: 0;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 800;
+  font-size: 1.22rem;
+  letter-spacing: -0.4px;
+}
+.logo-mark {
+  width: 26px; height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.logo-mark svg { width: 100%; height: 100%; }
+.logo-text { display: flex; align-items: baseline; color: var(--text); }
+.logo-text .pulse-word { color: var(--teal); }
+.logo-text .dot { color: var(--coral); font-size: 1.7rem; line-height: 0; margin-left: 1px; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.header-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--surface);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  font-size: 1.05rem;
+  transition: transform 0.15s;
+}
+.header-btn:active { transform: scale(0.9); }
+.header-btn .badge-dot {
+  position: absolute;
+  top: 8px; right: 9px;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--coral);
+  box-shadow: 0 0 8px var(--coral);
+}
+.avatar-btn {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--teal), #007B6E);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #0F1115;
+  border: 2px solid var(--bg-2);
+  box-shadow: 0 0 0 1.5px var(--teal);
+  overflow: hidden;
+}
+.avatar-btn img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ============================================================
+   Content Area
+   ============================================================ */
+.content {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+.view {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+  padding-bottom: 130px;
+}
+.view.active { opacity: 1; pointer-events: auto; }
+.view::-webkit-scrollbar { width: 0; }
+
+/* ============================================================
+   Pulse View (Map)
+   ============================================================ */
+#pulseView { overflow: hidden; padding-bottom: 0; }
+#map {
+  position: absolute;
+  inset: 0;
+  background: #0B0D12;
+  z-index: 1;
+}
+.leaflet-container { background: #0B0D12; font-family: var(--font); }
+.leaflet-control-zoom, .leaflet-control-attribution { display: none !important; }
+.leaflet-pane { z-index: 1 !important; }
+.leaflet-top, .leaflet-bottom { z-index: 2 !important; }
+
+.pulse-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  padding: 0 16px;
+  z-index: 10;
+  pointer-events: none;
+}
+.pulse-overlay > * { pointer-events: auto; }
+
+.location-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--border);
+  border-radius: 30px;
+  padding: 12px 18px;
+  margin-bottom: 12px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+  transition: transform 0.15s;
+}
+.location-pill:active { transform: scale(0.98); }
+.location-pill svg { flex-shrink: 0; color: var(--teal); }
+.location-pill .loc-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.filter-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.filter-row::-webkit-scrollbar { display: none; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 30px;
+  background: var(--surface);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-2);
+  transition: all 0.2s;
+}
+.chip.active {
+  background: var(--teal-dim);
+  border-color: var(--teal);
+  color: var(--teal);
+  box-shadow: var(--teal-glow);
+}
+.chip:active { transform: scale(0.95); }
+.chip svg { width: 14px; height: 14px; }
+
+/* Bus markers on map */
+.bus-marker-wrap {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bus-marker-wrap .ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--teal);
+  opacity: 0;
+  animation: busPulse 2.6s ease-out infinite;
+}
+.bus-marker-wrap .ring.d2 { animation-delay: 0.9s; }
+.bus-marker-wrap.full .ring { border-color: var(--coral); }
+@keyframes busPulse {
+  0% { transform: scale(0.45); opacity: 0.9; }
+  100% { transform: scale(1.15); opacity: 0; }
+}
+.bus-core {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  background: rgba(0,229,195,0.14);
+  border: 1.5px solid var(--teal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 0 20px rgba(0,229,195,0.4);
+  z-index: 2;
+}
+.bus-core svg { width: 22px; height: 22px; color: var(--teal); }
+.bus-marker-wrap.full .bus-core {
+  background: var(--coral-dim);
+  border-color: var(--coral);
+  box-shadow: 0 0 20px rgba(255,107,74,0.4);
+}
+.bus-marker-wrap.full .bus-core svg { color: var(--coral); }
+
+.user-marker-wrap {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--teal);
+  border: 3px solid #0F1115;
+  box-shadow: 0 0 0 2px var(--teal), 0 0 20px rgba(0,229,195,0.8);
+}
+.user-marker-wrap::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--teal);
+  opacity: 0.5;
+  animation: busPulse 2s ease-out infinite;
+}
+
+/* Bottom sheet card (lane preview on map) */
+.map-lane-card {
+  position: absolute;
+  bottom: 130px;
+  left: 16px;
+  right: 16px;
+  background: var(--surface);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+  z-index: 20;
+  transform: translateY(120%);
+  transition: transform 0.3s cubic-bezier(0.34, 1.3, 0.64, 1);
+  display: none;
+}
+.map-lane-card.show { transform: translateY(0); display: block; }
+.map-lane-card .close-x {
+  position: absolute;
+  top: 10px; right: 12px;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  color: var(--text-2);
+}
+.map-lane-card h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+  padding-right: 34px;
+}
+.map-lane-card .route {
+  font-size: 0.78rem;
+  color: var(--text-2);
+  margin-bottom: 12px;
+}
+.map-lane-card .stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.map-lane-card .stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.map-lane-card .stat.teal { color: var(--teal); }
+.map-lane-card .stat.coral { color: var(--coral); }
+.map-lane-card .actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ============================================================
+   Lanes View
+   ============================================================ */
+.view-header {
+  padding: 4px 18px 14px;
+}
+.view-header h2 {
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  margin-bottom: 4px;
+}
+.view-header p {
+  font-size: 0.88rem;
+  color: var(--text-2);
+}
+.view-header .right-pill {
+  float: right;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.view-header .right-pill .live-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--teal);
+  box-shadow: 0 0 8px var(--teal);
+  animation: livePulse 1.6s ease-in-out infinite;
+}
+@keyframes livePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.lane-list { padding: 0 18px; }
+.lane-card {
+  background: var(--surface);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+  transition: transform 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+.lane-card:active { transform: scale(0.99); }
+.lane-card .status-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--teal);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.lane-card .status-tag.delayed { color: var(--coral); }
+.lane-card .status-tag .live-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+  animation: livePulse 1.6s ease-in-out infinite;
+}
+.lane-card .row-1 {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+.occupancy-ring {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+}
+.occupancy-ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.occupancy-ring .bg-ring {
+  fill: none;
+  stroke: rgba(255,255,255,0.06);
+  stroke-width: 6;
+}
+.occupancy-ring .fg-ring {
+  fill: none;
+  stroke: var(--teal);
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.6s ease;
+  filter: drop-shadow(0 0 6px rgba(0,229,195,0.5));
+}
+.occupancy-ring.full .fg-ring {
+  stroke: var(--coral);
+  filter: drop-shadow(0 0 6px rgba(255,107,74,0.5));
+}
+.occupancy-ring .label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.occupancy-ring .num {
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.5px;
+}
+.occupancy-ring .sub {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+.lane-card .info { flex: 1; min-width: 0; }
+.lane-card .destination {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lane-card .route {
+  font-size: 0.76rem;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lane-card .route svg { width: 13px; height: 13px; flex-shrink: 0; color: var(--text-3); }
+.lane-card .fare-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 20px;
+  background: var(--coral-dim);
+  color: var(--coral);
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: 1px solid rgba(255,107,74,0.25);
+}
+.lane-card .row-2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.lane-card .driver {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.lane-card .driver-avatar {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2a3142, #1a1e28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.76rem;
+  color: var(--teal);
+  border: 1.5px solid var(--border);
+  flex-shrink: 0;
+}
+.lane-card .driver-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.15;
+}
+.lane-card .driver-rating {
+  font-size: 0.7rem;
+  color: var(--text-3);
+}
+.lane-card .driver-rating .star { color: #FFC857; }
+.lane-card .card-actions {
+  display: flex;
+  gap: 6px;
+}
+.btn-icon-sm {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  transition: all 0.15s;
+  color: var(--text);
+}
+.btn-icon-sm:active { transform: scale(0.9); }
+.btn-icon-sm svg { width: 16px; height: 16px; }
+.btn-request {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 30px;
+  background: var(--coral);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  transition: transform 0.15s;
+  box-shadow: 0 4px 16px rgba(255,107,74,0.3);
+}
+.btn-request:active { transform: scale(0.96); }
+.btn-request svg { width: 15px; height: 15px; }
+
+/* ============================================================
+   Near View (Proximity)
+   ============================================================ */
+.proximity-wrap {
+  position: relative;
+  height: 380px;
+  margin: 0 16px 20px;
+  border-radius: var(--radius);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(0,229,195,0.06) 0%, transparent 60%),
+    var(--bg-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.proximity-wrap::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 50% 50%, rgba(0,229,195,0.15) 1px, transparent 1.5px);
+  background-size: 28px 28px;
+  opacity: 0.35;
+  animation: gridDrift 20s linear infinite;
+}
+@keyframes gridDrift {
+  0% { background-position: 0 0; }
+  100% { background-position: 28px 28px; }
+}
+
+.center-user {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 78px; height: 78px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--teal), #007B6E);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.3rem;
+  color: #0F1115;
+  z-index: 5;
+  box-shadow: 0 0 0 4px rgba(0,229,195,0.15), 0 0 40px rgba(0,229,195,0.4);
+  animation: centerPulse 3s ease-in-out infinite;
+}
+@keyframes centerPulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(0,229,195,0.15), 0 0 40px rgba(0,229,195,0.4); }
+  50% { box-shadow: 0 0 0 10px rgba(0,229,195,0.08), 0 0 60px rgba(0,229,195,0.55); }
+}
+.center-label {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 52px);
+  transform: translateX(-50%);
+  background: var(--surface-solid);
+  border: 1px solid var(--teal);
+  border-radius: 14px;
+  padding: 6px 14px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--teal);
+  white-space: nowrap;
+  z-index: 6;
+}
+
+.peer-bubble {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  animation: fadeIn 0.5s ease backwards;
+  cursor: pointer;
+  z-index: 4;
+}
+.peer-bubble .p-avatar {
+  width: 50px; height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #232834, #16191f);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text);
+  border: 2px solid var(--teal);
+  box-shadow: 0 0 16px rgba(0,229,195,0.25);
+  transition: transform 0.2s;
+  position: relative;
+}
+.peer-bubble:active .p-avatar { transform: scale(0.92); }
+.peer-bubble .p-avatar.coral {
+  border-color: var(--coral);
+  box-shadow: 0 0 16px rgba(255,107,74,0.25);
+}
+.peer-bubble .p-label {
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 3px 9px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-2);
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1.3;
+}
+.peer-bubble .p-label .dist {
+  color: var(--teal);
+  font-weight: 700;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.connected-pill {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, calc(-50% + 110px));
+  background: var(--surface-solid);
+  border: 1px solid var(--teal);
+  border-radius: 14px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--teal);
+  z-index: 6;
+  box-shadow: 0 0 24px rgba(0,229,195,0.2);
+}
+.connected-pill .live-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--teal);
+  box-shadow: 0 0 8px var(--teal);
+  animation: livePulse 1.4s ease-in-out infinite;
+}
+
+/* Group chat rooms */
+.section-label {
+  padding: 4px 18px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.section-label .see-all {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--teal);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.room-card {
+  margin: 0 18px 10px;
+  background: var(--surface);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: transform 0.15s;
+}
+.room-card:active { transform: scale(0.98); }
+.room-card .room-icon {
+  width: 42px; height: 42px;
+  border-radius: 12px;
+  background: var(--teal-dim);
+  border: 1px solid rgba(0,229,195,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+.room-card .room-info { flex: 1; min-width: 0; }
+.room-card .room-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.room-card .room-name .live-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--teal);
+  box-shadow: 0 0 6px var(--teal);
+  animation: livePulse 1.6s ease-in-out infinite;
+}
+.room-card .room-meta {
+  font-size: 0.74rem;
+  color: var(--text-2);
+}
+.room-card .open-btn {
+  padding: 7px 14px;
+  border-radius: 20px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ============================================================
+   Hive View (Community)
+   ============================================================ */
+.hive-header {
+  text-align: center;
+  padding: 8px 18px 20px;
+}
+.hive-header h1 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--teal);
+  letter-spacing: -1px;
+  margin-bottom: 4px;
+}
+.hive-header p {
+  font-size: 0.85rem;
+  color: var(--text-2);
+}
+.story-row {
+  display: flex;
+  gap: 12px;
+  padding: 0 18px 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.story-row::-webkit-scrollbar { display: none; }
+.story {
+  flex-shrink: 0;
+  width: 62px;
+  text-align: center;
+}
+.story .story-ring {
+  width: 58px; height: 58px;
+  border-radius: 50%;
+  padding: 2px;
+  background: linear-gradient(135deg, var(--teal), var(--coral));
+  margin-bottom: 6px;
+}
+.story .story-inner {
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  background: var(--surface-solid);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text);
+  border: 2px solid var(--bg);
+  overflow: hidden;
+}
+.story .story-inner.add {
+  background: var(--surface-2);
+  color: var(--teal);
+  font-size: 1.5rem;
+  font-weight: 300;
+}
+.story .story-name {
+  font-size: 0.68rem;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.greeting-card {
+  margin: 0 18px 20px;
+  padding: 18px;
+  background:
+    linear-gradient(135deg, rgba(0,229,195,0.08), rgba(255,107,74,0.05)),
+    var(--surface-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  position: relative;
+  overflow: hidden;
+}
+.greeting-card h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.greeting-card p {
+  font-size: 0.82rem;
+  color: var(--text-2);
+  margin-bottom: 10px;
+}
+.greeting-card .tag {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.greeting-card svg.graphic {
+  position: absolute;
+  right: -10px;
+  bottom: -10px;
+  width: 100px;
+  height: 100px;
+  color: var(--teal);
+  opacity: 0.15;
+}
+
+.post-card {
+  margin: 0 18px 12px;
+  background: var(--surface);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.post-card .post-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.post-card .post-avatar {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #232834, #16191f);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--teal);
+  border: 1.5px solid var(--border);
+  flex-shrink: 0;
+}
+.post-card .post-meta { flex: 1; min-width: 0; }
+.post-card .post-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.post-card .post-name .verified {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--teal);
+  color: #0F1115;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.55rem;
+  font-weight: 900;
+}
+.post-card .post-time {
+  font-size: 0.72rem;
+  color: var(--text-3);
+}
+.post-card .post-body {
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+.post-card .post-media {
+  width: 100%;
+  height: 160px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, #1a1e28, #0F1115);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.post-card .play-btn {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: rgba(0,229,195,0.15);
+  border: 1.5px solid var(--teal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--teal);
+  font-size: 1.1rem;
+  backdrop-filter: blur(6px);
+}
+.post-card .post-actions {
+  display: flex;
+  gap: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.post-card .pa-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-2);
+  transition: color 0.15s;
+}
+.post-card .pa-btn:active { color: var(--teal); }
+.post-card .pa-btn svg { width: 16px; height: 16px; }
+.post-card .pa-btn.liked { color: var(--coral); }
+.post-card .pa-btn.liked svg { fill: var(--coral); }
+
+.event-card {
+  margin: 0 18px 12px;
+  padding: 16px;
+  background:
+    linear-gradient(135deg, rgba(168,224,99,0.06), transparent),
+    var(--surface-solid);
+  border: 1px solid rgba(168,224,99,0.15);
+  border-radius: var(--radius);
+  position: relative;
+}
+.event-card .ev-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--lime);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.event-card h4 {
+  font-size: 0.98rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.event-card p {
+  font-size: 0.78rem;
+  color: var(--text-2);
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+.event-card .ev-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.event-card .ev-people {
+  display: flex;
+  align-items: center;
+}
+.event-card .ev-people .mini-av {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 2px solid var(--surface-solid);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--teal);
+  margin-left: -8px;
+}
+.event-card .ev-people .mini-av:first-child { margin-left: 0; }
+.event-card .ev-people .mini-av.more {
+  background: var(--teal);
+  color: #0F1115;
+  font-size: 0.6rem;
+}
+.event-card .join-btn {
+  padding: 8px 16px;
+  border-radius: 20px;
+  background: var(--lime);
+  color: #0F1115;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.poll-card {
+  margin: 0 18px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.poll-card h4 {
+  font-size: 0.92rem;
+  font-weight: 700;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.poll-card h4 svg { color: var(--teal); width: 16px; height: 16px; }
+.poll-option {
+  margin-bottom: 10px;
+}
+.poll-option .po-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  margin-bottom: 5px;
+}
+.poll-option .po-head .pct { color: var(--text-2); font-weight: 600; }
+.poll-option .po-bar {
+  height: 6px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.poll-option .po-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--teal), var(--lime));
+  border-radius: 3px;
+  transition: width 0.8s ease;
+  box-shadow: 0 0 10px rgba(0,229,195,0.3);
+}
+.poll-foot {
+  font-size: 0.7rem;
+  color: var(--text-3);
+  margin-top: 10px;
+  text-align: center;
+}
+
+/* ============================================================
+   FAB
+   ============================================================ */
+.fab {
+  position: fixed;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 14px 24px 14px 18px;
+  border-radius: 32px;
+  background: var(--teal);
+  color: #0F1115;
+  font-weight: 700;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 8px 32px rgba(0,229,195,0.4), 0 0 0 6px rgba(0,229,195,0.08);
+  z-index: 40;
+  transition: transform 0.2s, box-shadow 0.2s;
+  max-width: 320px;
+}
+.fab:active { transform: translateX(-50%) scale(0.95); }
+.fab .fab-icon {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: rgba(15,17,21,0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  font-weight: 300;
+}
+.fab .fab-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.1;
+}
+.fab .fab-sub {
+  font-size: 0.68rem;
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+/* ============================================================
+   Bottom Navigation
+   ============================================================ */
+.bottom-nav {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(15,17,21,0.92);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+  z-index: 45;
+}
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 14px;
+  color: var(--text-3);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  transition: color 0.2s;
+  position: relative;
+}
+.nav-item svg { width: 22px; height: 22px; transition: transform 0.2s; }
+.nav-item.active { color: var(--teal); }
+.nav-item.active svg { transform: scale(1.1); filter: drop-shadow(0 0 8px rgba(0,229,195,0.5)); }
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 2.5px;
+  border-radius: 2px;
+  background: var(--teal);
+  box-shadow: 0 0 10px var(--teal);
+}
+.nav-item:active svg { transform: scale(0.9); }
+
+/* ============================================================
+   Modal
+   ============================================================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+  background: var(--surface-solid);
+  border-radius: 24px 24px 0 0;
+  border-top: 1px solid var(--border);
+  padding: 20px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 88vh;
+  overflow-y: auto;
+  animation: slideUp 0.3s cubic-bezier(0.34, 1.3, 0.64, 1);
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.modal .handle {
+  width: 40px; height: 4px;
+  background: var(--surface-2);
+  border-radius: 2px;
+  margin: 0 auto 18px;
+}
+.modal h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+.modal label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-2);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.modal input, .modal textarea, .modal select {
+  width: 100%;
+  padding: 13px 16px;
+  border-radius: 12px;
+  background: var(--bg-2);
+  border: 1.5px solid var(--border);
+  color: var(--text);
+  font-size: 0.92rem;
+  margin-bottom: 14px;
+  transition: border-color 0.2s;
+}
+.modal input:focus, .modal textarea:focus, .modal select:focus {
+  border-color: var(--teal);
+}
+.modal textarea { resize: vertical; min-height: 70px; }
+.modal .row {
+  display: flex;
+  gap: 10px;
+}
+.modal .row > * { flex: 1; }
+.btn-primary {
+  width: 100%;
+  padding: 15px;
+  border-radius: 14px;
+  background: var(--teal);
+  color: #0F1115;
+  font-weight: 700;
+  font-size: 0.95rem;
+  transition: transform 0.15s;
+  margin-bottom: 8px;
+}
+.btn-primary:active { transform: scale(0.97); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary {
+  width: 100%;
+  padding: 15px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.9rem;
+  border: 1px solid var(--border);
+  transition: transform 0.15s;
+}
+.btn-secondary:active { transform: scale(0.97); }
+.btn-coral {
+  width: 100%;
+  padding: 15px;
+  border-radius: 14px;
+  background: var(--coral);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  transition: transform 0.15s;
+}
+.btn-coral:active { transform: scale(0.97); }
+
+/* Occupancy selector */
+.seat-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.seat-btn {
+  flex: 1;
+  min-width: 60px;
+  padding: 12px 8px;
+  border-radius: 12px;
+  background: var(--bg-2);
+  border: 1.5px solid var(--border);
+  text-align: center;
+  transition: all 0.15s;
+}
+.seat-btn .num {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1;
+}
+.seat-btn .lbl {
+  display: block;
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--text-3);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.seat-btn.active {
+  border-color: var(--teal);
+  background: var(--teal-dim);
+}
+.seat-btn.active .num, .seat-btn.active .lbl { color: var(--teal); }
+.seat-btn:active { transform: scale(0.96); }
+
+/* Chat modal */
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+.chat-header .ch-avatar {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--teal), #007B6E);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #0F1115;
+  font-size: 0.9rem;
+}
+.chat-header .ch-info { flex: 1; }
+.chat-header .ch-name { font-size: 0.95rem; font-weight: 700; }
+.chat-header .ch-status {
+  font-size: 0.74rem;
+  color: var(--teal);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.chat-header .ch-status .live-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--teal);
+  box-shadow: 0 0 6px var(--teal);
+  animation: livePulse 1.6s ease-in-out infinite;
+}
+.chat-messages {
+  height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-right: 4px;
+}
+.chat-messages::-webkit-scrollbar { width: 3px; }
+.chat-messages::-webkit-scrollbar-thumb { background: var(--surface-2); border-radius: 3px; }
+.chat-msg {
+  max-width: 78%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 0.86rem;
+  line-height: 1.4;
+  word-break: break-word;
+  animation: fadeIn 0.2s ease;
+}
+.chat-msg.me {
+  align-self: flex-end;
+  background: var(--teal);
+  color: #0F1115;
+  border-bottom-right-radius: 4px;
+  font-weight: 500;
+}
+.chat-msg.them {
+  align-self: flex-start;
+  background: var(--surface-2);
+  color: var(--text);
+  border-bottom-left-radius: 4px;
+}
+.chat-msg .sender {
+  font-size: 0.68rem;
+  font-weight: 700;
+  opacity: 0.65;
+  margin-bottom: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.chat-msg .time {
+  font-size: 0.62rem;
+  opacity: 0.5;
+  margin-top: 3px;
+  text-align: right;
+}
+.chat-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.chat-input-row input {
+  flex: 1;
+  padding: 13px 18px;
+  border-radius: 24px;
+  background: var(--bg-2);
+  border: 1.5px solid var(--border);
+  color: var(--text);
+  font-size: 0.9rem;
+  margin: 0;
+}
+.chat-input-row input:focus { border-color: var(--teal); }
+.chat-input-row .send-btn {
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  background: var(--teal);
+  color: #0F1115;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+.chat-input-row .send-btn:active { transform: scale(0.9); }
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: calc(160px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: var(--surface-solid);
+  color: var(--text);
+  padding: 12px 22px;
+  border-radius: 30px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  transition: transform 0.3s ease;
+  z-index: 2000;
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: 90%;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* Empty state */
+.empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-3);
+}
+.empty .icon { font-size: 2.5rem; margin-bottom: 8px; }
+.empty p { font-size: 0.85rem; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="13" stroke="#00E5C3" stroke-width="2"/>
+          <circle cx="16" cy="16" r="4" fill="#00E5C3"/>
+          <path d="M16 3v9M16 20v9M3 16h9M20 16h9" stroke="#00E5C3" stroke-width="1.6" stroke-linecap="round" opacity="0.6"/>
+          <circle cx="24" cy="8" r="2.5" fill="#FF6B4A"/>
+        </svg>
+      </div>
+      <div class="logo-text">
+        <span>Steer</span><span class="pulse-word">adar</span><span class="dot">.</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="header-btn" id="notifBtn" title="Notifications">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        <span class="badge-dot"></span>
+      </button>
+      <button class="avatar-btn" id="avatarBtn">V</button>
+    </div>
+  </header>
+
+  <!-- Content -->
+  <div class="content">
+    <!-- Pulse View (Map) -->
+    <div id="pulseView" class="view active">
+      <div id="map"></div>
+      <div class="pulse-overlay">
+        <div class="location-pill" id="locationPill">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+          <span class="loc-text" id="locText">Locating…</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </div>
+        <div class="filter-row">
+          <button class="chip active" data-filter="live">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Live now
+          </button>
+          <button class="chip" data-filter="all">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>
+            All
+          </button>
+          <button class="chip" data-filter="seats">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>
+            Seats
+          </button>
+          <button class="chip" data-filter="fav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            Favourites
+          </button>
+        </div>
+      </div>
+      <div class="map-lane-card" id="mapLaneCard"></div>
+    </div>
+
+    <!-- Lanes View (Live drivers feed) -->
+    <div id="lanesView" class="view">
+      <div class="view-header">
+        <span class="right-pill"><span class="live-dot"></span> All lanes</span>
+        <h2>Live Drivers</h2>
+        <p>Real-time community rides near you</p>
+      </div>
+      <div class="lane-list" id="laneList"></div>
+    </div>
+
+    <!-- Near View (Bluetooth proximity) -->
+    <div id="nearView" class="view">
+      <div class="view-header">
+        <h2>Near</h2>
+        <p>People and buses around you</p>
+      </div>
+      <div class="proximity-wrap" id="proximityWrap">
+        <!-- Populated by JS -->
+      </div>
+      <div class="section-label">
+        Group chats
+        <span class="see-all">See all →</span>
+      </div>
+      <div id="roomList"></div>
+    </div>
+
+    <!-- Hive View (Community) -->
+    <div id="hiveView" class="view">
+      <div class="hive-header">
+        <h1>Hive</h1>
+        <p>Your community. All aboard.</p>
+      </div>
+      <div class="story-row" id="storyRow"></div>
+      <div class="greeting-card">
+        <h3>Good evening, Vihaan 👋</h3>
+        <p>Here's what's happening in your community.</p>
+        <span class="tag">Greenwood Heights</span>
+        <svg class="graphic" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="15" y="30" width="70" height="45" rx="6"/>
+          <circle cx="30" cy="78" r="6"/>
+          <circle cx="70" cy="78" r="6"/>
+          <path d="M20 40h60M20 50h40"/>
+        </svg>
+      </div>
+      <div class="section-label">Local posts <span class="see-all">See all →</span></div>
+      <div id="hiveFeed"></div>
+    </div>
+  </div>
+
+  <!-- FAB -->
+  <button class="fab" id="fabBtn">
+    <span class="fab-icon">+</span>
+    <span class="fab-text">
+      <span id="fabLabel">Post Status</span>
+      <span class="fab-sub" id="fabSub">Share occupancy & ride</span>
+    </span>
+  </button>
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-tab="pulse">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      Pulse
+    </button>
+    <button class="nav-item" data-tab="lanes">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="6" width="18" height="14" rx="3"/>
+        <path d="M3 12h18M8 6V4M16 6V4"/>
+        <circle cx="8" cy="16" r="1.2" fill="currentColor"/>
+        <circle cx="16" cy="16" r="1.2" fill="currentColor"/>
+      </svg>
+      Lanes
+    </button>
+    <button class="nav-item" data-tab="near">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+        <path d="M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" opacity="0.5"/>
+      </svg>
+      Near
+    </button>
+    <button class="nav-item" data-tab="hive">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/>
+        <path d="M12 3v9M12 12l8 4.5M12 12l-8 4.5"/>
+      </svg>
+      Hive
+    </button>
+  </nav>
+</div>
+
+<!-- Post Status Modal -->
+<div class="modal-overlay" id="postModal">
+  <div class="modal">
+    <div class="handle"></div>
+    <h3>Post your lane</h3>
+
+    <label>Where are you going?</label>
+    <input type="text" id="pDest" placeholder="e.g. Downtown Central">
+
+    <label>Route (stops separated by commas)</label>
+    <input type="text" id="pRoute" placeholder="e.g. Maple, Oak, Center St">
+
+    <label>How full is your bus?</label>
+    <div class="seat-selector" id="seatSelector">
+      <button class="seat-btn" data-seats="4"><span class="num">1</span><span class="lbl">Seats</span></button>
+      <button class="seat-btn" data-seats="3"><span class="num">2</span><span class="lbl">Seats</span></button>
+      <button class="seat-btn" data-seats="2"><span class="num">3</span><span class="lbl">Seats</span></button>
+      <button class="seat-btn" data-seats="1"><span class="num">4</span><span class="lbl">Seats</span></button>
+      <button class="seat-btn" data-seats="0"><span class="num">Full</span><span class="lbl">No seats</span></button>
+    </div>
+
+    <label>Fare (₹)</label>
+    <input type="number" id="pFare" placeholder="20" value="20" min="0">
+
+    <button class="btn-primary" id="postConfirm">Publish to community</button>
+    <button class="btn-secondary" id="postCancel">Cancel</button>
+  </div>
+</div>
+
+<!-- Request Seat Modal -->
+<div class="modal-overlay" id="requestModal">
+  <div class="modal">
+    <div class="handle"></div>
+    <h3>Request a seat</h3>
+    <p id="reqInfo" style="color:var(--text-2);font-size:0.88rem;margin-bottom:16px;"></p>
+    <label>Your message (optional)</label>
+    <textarea id="reqMsg" placeholder="Hi! I'm at the Main Gate, can you wait 2 minutes?"></textarea>
+    <button class="btn-primary" id="reqConfirm">Send request</button>
+    <button class="btn-secondary" id="reqCancel">Cancel</button>
+  </div>
+</div>
+
+<!-- Chat Modal -->
+<div class="modal-overlay" id="chatModal">
+  <div class="modal" style="height:80vh;display:flex;flex-direction:column;">
+    <div class="handle"></div>
+    <div class="chat-header">
+      <div class="ch-avatar" id="chatAvatar">M</div>
+      <div class="ch-info">
+        <div class="ch-name" id="chatName">Lane chat</div>
+        <div class="ch-status">
+          <span class="live-dot"></span>
+          <span id="chatStatus">Connecting…</span>
+        </div>
+      </div>
+      <button class="header-btn" id="chatClose" style="width:34px;height:34px;">✕</button>
+    </div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-input-row">
+      <input type="text" id="chatInput" placeholder="Type a message…">
+      <button class="send-btn" id="chatSend">➤</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- CDN Libraries -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+<script>
+/* ============================================================
+   STEERADAR — App Logic
+   ============================================================ */
+
+// ---------------- Utilities ----------------
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const timeAgo = (ts) => {
+  const d = Date.now() - ts;
+  const m = Math.floor(d/60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + 'm ago';
+  const h = Math.floor(m/60);
+  if (h < 24) return h + 'h ago';
+  return Math.floor(h/24) + 'd ago';
+};
+const showToast = (msg) => {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 2400);
+};
+
+// ---------------- Seed lanes (Bangalore area) ----------------
+const SEED_LANES = [
+  {
+    id: 'lane-1',
+    driver: 'Marcus T.',
+    avatar: 'MT',
+    rating: 4.9,
+    route: { from: 'Koramangala 5th', via: ['Indiranagar'], to: 'Marathahalli' },
+    seats: { total: 10, taken: 6 },
+    fare: 20,
+    status: 'live',
+    lat: 12.9352, lng: 77.6245,
+    peerId: 'steeradar-lane-1'
+  },
+  {
+    id: 'lane-2',
+    driver: 'Aisha B.',
+    avatar: 'AB',
+    rating: 4.8,
+    route: { from: 'Jayanagar', via: ['JP Nagar'], to: 'Whitefield' },
+    seats: { total: 10, taken: 3 },
+    fare: 25,
+    status: 'live',
+    lat: 12.9308, lng: 77.5838,
+    peerId: 'steeradar-lane-2'
+  },
+  {
+    id: 'lane-3',
+    driver: 'James L.',
+    avatar: 'JL',
+    rating: 4.7,
+    route: { from: 'Domlur', via: ['Indiranagar 12th Main'], to: 'Koramangala' },
+    seats: { total: 10, taken: 8 },
+    fare: 15,
+    status: 'live',
+    lat: 12.9609, lng: 77.6387,
+    peerId: 'steeradar-lane-3'
+  },
+  {
+    id: 'lane-4',
+    driver: 'Priya S.',
+    avatar: 'PS',
+    rating: 4.9,
+    route: { from: 'Whitefield', via: ['Marathahalli', 'Domlur'], to: 'MG Road' },
+    seats: { total: 12, taken: 5 },
+    fare: 30,
+    status: 'live',
+    lat: 12.9698, lng: 77.7500,
+    peerId: 'steeradar-lane-4'
+  }
+];
+
+// ---------------- State ----------------
+let map = null;
+let busMarkers = [];
+let userMarker = null;
+let currentTab = 'pulse';
+let selectedFilter = 'live';
+let lanes = loadLanes();
+let peer = null;
+let peerConn = null;
+let activeChatLane = null;
+let userName = localStorage.getItem('steeradar-name') || 'You';
+
+// ---------------- Storage ----------------
+function loadLanes() {
+  try {
+    const stored = localStorage.getItem('steeradar-lanes');
+    if (stored) return JSON.parse(stored);
+  } catch (e) {}
+  localStorage.setItem('steeradar-lanes', JSON.stringify(SEED_LANES));
+  return [...SEED_LANES];
+}
+function saveLanes() {
+  localStorage.setItem('steeradar-lanes', JSON.stringify(lanes));
+}
+
+// ---------------- Tab switching ----------------
+$$('.nav-item').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    currentTab = tab;
+    $$('.nav-item').forEach(b => b.classList.toggle('active', b === btn));
+    $$('.view').forEach(v => v.classList.toggle('active', v.id === tab + 'View'));
+    updateFab();
+    if (tab === 'pulse' && map) setTimeout(() => map.invalidateSize(), 150);
+  });
+});
+
+function updateFab() {
+  const label = $('#fabLabel');
+  const sub = $('#fabSub');
+  if (currentTab === 'lanes' || currentTab === 'pulse') {
+    label.textContent = 'Post Status';
+    sub.textContent = 'Share occupancy & ride';
+  } else if (currentTab === 'near') {
+    label.textContent = 'Go Visible';
+    sub.textContent = 'Let others see you nearby';
+  } else {
+    label.textContent = 'New Post';
+    sub.textContent = 'Share with the community';
+  }
+}
+
+// ---------------- Filter chips ----------------
+$$('.chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    $$('.chip').forEach(c => c.classList.toggle('active', c === chip));
+    selectedFilter = chip.dataset.filter;
+    renderBusMarkers();
+  });
+});
+
+// ---------------- Map ----------------
+function initMap() {
+  map = L.map('map', {
+    zoomControl: false,
+    attributionControl: false,
+    center: [12.9500, 77.6500],
+    zoom: 12
+  });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    subdomains: 'abcd'
+  }).addTo(map);
+
+  // Try to get user location
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        map.setView([latitude, longitude], 13);
+        if (userMarker) map.removeLayer(userMarker);
+        userMarker = L.marker([latitude, longitude], {
+          icon: L.divIcon({
+            className: '',
+            html: '<div class="user-marker-wrap"></div>',
+            iconSize: [22, 22],
+            iconAnchor: [11, 11]
+          })
+        }).addTo(map);
+        reverseGeocode(latitude, longitude);
+      },
+      () => {
+        $('#locText').textContent = 'Bengaluru, Karnataka';
+        reverseGeocode(12.9716, 77.5946);
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  } else {
+    $('#locText').textContent = 'Bengaluru, Karnataka';
+    reverseGeocode(12.9716, 77.5946);
+  }
+
+  renderBusMarkers();
+}
+
+function reverseGeocode(lat, lng) {
+  fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14`)
+    .then(r => r.json())
+    .then(data => {
+      if (data && data.address) {
+        const a = data.address;
+        const parts = [a.suburb || a.neighbourhood, a.city || a.town || a.state_district].filter(Boolean);
+        $('#locText').textContent = parts.length ? parts.join(', ') : (data.display_name || 'Your location').split(',').slice(0,2).join(', ');
+      }
+    })
+    .catch(() => { $('#locText').textContent = 'Bengaluru, Karnataka'; });
+}
+
+function renderBusMarkers() {
+  busMarkers.forEach(m => map.removeLayer(m));
+  busMarkers = [];
+
+  const filtered = lanes.filter(lane => {
+    if (selectedFilter === 'live') return lane.status === 'live';
+    if (selectedFilter === 'seats') return (lane.seats.total - lane.seats.taken) > 0;
+    if (selectedFilter === 'fav') return false;
+    return true;
+  });
+
+  filtered.forEach(lane => {
+    const occupancy = lane.seats.taken / lane.seats.total;
+    const isFull = occupancy >= 0.85;
+    const icon = L.divIcon({
+      className: '',
+      html: `
+        <div class="bus-marker-wrap ${isFull ? 'full' : ''}">
+          <div class="ring"></div>
+          <div class="ring d2"></div>
+          <div class="bus-core">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="6" width="18" height="14" rx="3"/>
+              <path d="M3 12h18M8 6V4M16 6V4"/>
+              <circle cx="8" cy="16" r="1.2" fill="currentColor"/>
+              <circle cx="16" cy="16" r="1.2" fill="currentColor"/>
+            </svg>
+          </div>
+        </div>`,
+      iconSize: [64, 64],
+      iconAnchor: [32, 32]
+    });
+    const marker = L.marker([lane.lat, lane.lng], { icon }).addTo(map);
+    marker.on('click', () => showLaneCard(lane));
+    busMarkers.push(marker);
+  });
+}
+
+function showLaneCard(lane) {
+  const card = $('#mapLaneCard');
+  const seatsLeft = lane.seats.total - lane.seats.taken;
+  const isFull = seatsLeft === 0;
+  card.innerHTML = `
+    <button class="close-x" id="mapCardClose">✕</button>
+    <h3>${esc(lane.route.to)}</h3>
+    <div class="route">🚌 ${esc(lane.route.from)} → ${esc(lane.route.via.join(' → '))} → ${esc(lane.route.to)}</div>
+    <div class="stats">
+      <div class="stat ${isFull ? 'coral' : 'teal'}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>
+        ${isFull ? 'Full' : seatsLeft + ' seats left'}
+      </div>
+      <div class="stat coral">₹${lane.fare}</div>
+    </div>
+    <div class="actions">
+      <button class="btn-request" style="flex:1" id="mapChatBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Chat
+      </button>
+      <button class="btn-request" style="flex:1" id="mapReqBtn" ${isFull ? 'disabled' : ''}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        Request
+      </button>
+    </div>
+  `;
+  card.classList.add('show');
+  $('#mapCardClose').onclick = () => card.classList.remove('show');
+  $('#mapChatBtn').onclick = () => openChat(lane);
+  $('#mapReqBtn').onclick = () => { card.classList.remove('show'); openRequest(lane); };
+  if (userMarker) map.setView([lane.lat, lane.lng], 14, { animate: true });
+}
+
+// ---------------- Lanes feed ----------------
+function renderLanes() {
+  const list = $('#laneList');
+  if (!lanes.length) {
+    list.innerHTML = `<div class="empty"><div class="icon">🚌</div><p>No lanes yet. Be the first to post.</p></div>`;
+    return;
+  }
+  const sorted = [...lanes].sort((a,b) => b.fare - a.fare);
+  list.innerHTML = sorted.map(lane => {
+    const seatsLeft = lane.seats.total - lane.seats.taken;
+    const occupancy = lane.seats.taken / lane.seats.total;
+    const pct = Math.round(occupancy * 100);
+    const isFull = seatsLeft === 0;
+    const circumference = 2 * Math.PI * 30;
+    const dash = occupancy * circumference;
+    const statusLabel = isFull ? 'Full' : (lane.status === 'delayed' ? 'Delayed' : 'On time');
+
+    return `
+      <div class="lane-card" data-id="${lane.id}">
+        <div class="status-tag ${isFull ? 'delayed' : ''}">
+          <span class="live-dot"></span>
+          ${isFull ? 'FULL · ' : 'LIVE · '}${statusLabel.toUpperCase()}
+        </div>
+        <div class="row-1">
+          <div class="occupancy-ring ${isFull ? 'full' : ''}">
+            <svg viewBox="0 0 72 72">
+              <circle class="bg-ring" cx="36" cy="36" r="30"/>
+              <circle class="fg-ring" cx="36" cy="36" r="30"
+                stroke-dasharray="${dash} ${circumference}"
+                stroke-dashoffset="0"/>
+            </svg>
+            <div class="label">
+              <span class="num">${isFull ? '0' : seatsLeft}</span>
+              <span class="sub">Seats</span>
+            </div>
+          </div>
+          <div class="info">
+            <div class="destination">${esc(lane.route.to)}</div>
+            <div class="route">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 12h18"/></svg>
+              ${esc(lane.route.from)} → ${esc(lane.route.via.join(' → '))} → ${esc(lane.route.to)}
+            </div>
+            <span class="fare-tag">₹ ${lane.fare}</span>
+          </div>
+        </div>
+        <div class="row-2">
+          <div class="driver">
+            <div class="driver-avatar">${esc(lane.avatar)}</div>
+            <div>
+              <div class="driver-name">${esc(lane.driver)}</div>
+              <div class="driver-rating"><span class="star">★</span> ${lane.rating}</div>
+            </div>
+          </div>
+          <div class="card-actions">
+            <button class="btn-icon-sm" data-action="chat" data-id="${lane.id}" title="Chat">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </button>
+            <button class="btn-request" data-action="request" data-id="${lane.id}" ${isFull ? 'disabled style="opacity:.5"' : ''}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+              Request
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  list.querySelectorAll('[data-action]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const lane = lanes.find(l => l.id === btn.dataset.id);
+      if (!lane) return;
+      if (btn.dataset.action === 'chat') openChat(lane);
+      else openRequest(lane);
+    });
+  });
+}
+
+// ---------------- Near (Proximity) ----------------
+const NEAR_PEOPLE = [
+  { name: 'Maya R.', avatar: 'MR', status: 'Looking for ride', dist: 12, angle: -40, coral: false },
+  { name: 'Jordan K.', avatar: 'JK', status: 'Driving to market', dist: 19, angle: 35, coral: true },
+  { name: 'Priya S.', avatar: 'PS', status: 'Waiting at stop', dist: 26, angle: -140, coral: false },
+  { name: 'Arjun', avatar: 'A', status: 'On a break', dist: 31, angle: 140, coral: false },
+  { name: 'Meera', avatar: 'M', status: 'Heading home', dist: 47, angle: 70, coral: false }
+];
+
+function renderNear() {
+  const wrap = $('#proximityWrap');
+  const cx = 50, cy = 50, maxR = 44;
+  const html = [];
+
+  // Center label
+  html.push(`<div class="center-label">Looking for ride · Koramangala → Center</div>`);
+  html.push(`<div class="center-user">${userName.charAt(0).toUpperCase()}</div>`);
+
+  NEAR_PEOPLE.forEach((p, i) => {
+    const rad = (p.angle * Math.PI) / 180;
+    const radius = (p.dist / 60) * maxR;
+    const x = cx + Math.cos(rad) * radius;
+    const y = cy + Math.sin(rad) * radius;
+    html.push(`
+      <div class="peer-bubble" style="left:${x}%;top:${y}%;transform:translate(-50%,-50%);animation-delay:${i * 0.07}s" data-name="${esc(p.name)}">
+        <div class="p-avatar ${p.coral ? 'coral' : ''}">${esc(p.avatar)}</div>
+        <div class="p-label"><span class="dist">${p.dist} m</span><br>${esc(p.status)}</div>
+      </div>
+    `);
+  });
+
+  // Connected pill
+  html.push(`<div class="connected-pill"><span class="live-dot"></span> Connected · 8 m · Excellent</div>`);
+
+  wrap.innerHTML = html.join('');
+
+  wrap.querySelectorAll('.peer-bubble').forEach(b => {
+    b.addEventListener('click', () => {
+      const name = b.dataset.name;
+      showToast('Waving at ' + name + '…');
+    });
+  });
+
+  // Rooms
+  const rooms = [
+    { name: 'Lane #47 Chat', meta: '12 people nearby · Live', emoji: '🚌' },
+    { name: 'Main Gate Waiting', meta: '5 waiting · 2 min', emoji: '⏳' },
+    { name: 'Koramangala → Marathahalli', meta: '8 aboard', emoji: '🛣️' }
+  ];
+  $('#roomList').innerHTML = rooms.map(r => `
+    <div class="room-card">
+      <div class="room-icon">${r.emoji}</div>
+      <div class="room-info">
+        <div class="room-name">${esc(r.name)} <span class="live-dot"></span></div>
+        <div class="room-meta">${esc(r.meta)}</div>
+      </div>
+      <button class="open-btn">Open →</button>
+    </div>
+  `).join('');
+
+  $('#roomList').querySelectorAll('.room-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const name = card.querySelector('.room-name').textContent.replace(/\s+/g, ' ').trim().replace(' ●', '');
+      showToast('Joining ' + name + '…');
+    });
+  });
+}
+
+// ---------------- Hive ----------------
+const HIVE_POSTS = [
+  {
+    name: 'Karan (Driver)',
+    verified: true,
+    avatar: 'KD',
+    time: '2h ago · Route 12',
+    text: 'Morning traffic was smoother today! 🚌 Thanks for the patience, team. Let\'s keep making our rides better.',
+    media: true,
+    likes: 24, comments: 7, shares: 3
+  },
+  {
+    name: 'Ananya',
+    verified: false,
+    avatar: 'AN',
+    time: '5h ago · Indiranagar',
+    text: 'Found a lost blue backpack on the 6:15 to Marathahalli. Kept it safe with the driver — DM if it\'s yours!',
+    media: false,
+    likes: 41, comments: 12, shares: 6
+  }
+];
+
+function renderHive() {
+  // Stories
+  const stories = [
+    { label: 'Add', avatar: '＋', add: true },
+    { label: 'Ananya', avatar: 'AN' },
+    { label: 'Rohit', avatar: 'R' },
+    { label: 'Meera', avatar: 'M' },
+    { label: 'Arjun', avatar: 'A' }
+  ];
+  $('#storyRow').innerHTML = stories.map(s => `
+    <div class="story">
+      <div class="story-ring">
+        <div class="story-inner ${s.add ? 'add' : ''}">${esc(s.avatar)}</div>
+      </div>
+      <div class="story-name">${esc(s.label)}</div>
+    </div>
+  `).join('');
+
+  // Feed
+  const feed = [];
+
+  // Post 1
+  HIVE_POSTS.forEach(post => {
+    feed.push(`
+      <div class="post-card">
+        <div class="post-head">
+          <div class="post-avatar">${esc(post.avatar)}</div>
+          <div class="post-meta">
+            <div class="post-name">${esc(post.name)} ${post.verified ? '<span class="verified">✓</span>' : ''}</div>
+            <div class="post-time">${esc(post.time)}</div>
+          </div>
+        </div>
+        <div class="post-body">${esc(post.text)}</div>
+        ${post.media ? `
+          <div class="post-media">
+            <div class="play-btn">▶</div>
+          </div>
+        ` : ''}
+        <div class="post-actions">
+          <button class="pa-btn" data-act="like">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            ${post.likes}
+          </button>
+          <button class="pa-btn" data-act="comment">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            ${post.comments}
+          </button>
+          <button class="pa-btn" data-act="share">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            ${post.shares}
+          </button>
+        </div>
+      </div>
+    `);
+  });
+
+  // Event card
+  feed.push(`
+    <div class="event-card">
+      <div class="ev-tag">📅 Happening this week</div>
+      <h4>Evening cricket — 3 seats left</h4>
+      <p>Thu, 22 May · 6:30 PM · Community Ground<br>Bring your bat, game, and good vibes!</p>
+      <div class="ev-foot">
+        <div class="ev-people">
+          <div class="mini-av">AN</div>
+          <div class="mini-av">R</div>
+          <div class="mini-av">M</div>
+          <div class="mini-av more">+8</div>
+        </div>
+        <button class="join-btn">Join now →</button>
+      </div>
+    </div>
+  `);
+
+  // Poll card
+  feed.push(`
+    <div class="poll-card">
+      <h4>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg>
+        What's your favourite bus stop upgrade?
+      </h4>
+      <div class="poll-option">
+        <div class="po-head"><span>Real-time bus arrival screens</span><span class="pct">48%</span></div>
+        <div class="po-bar"><div class="po-fill" style="width:48%"></div></div>
+      </div>
+      <div class="poll-option">
+        <div class="po-head"><span>More seating & shade</span><span class="pct">32%</span></div>
+        <div class="po-bar"><div class="po-fill" style="width:32%"></div></div>
+      </div>
+      <div class="poll-option">
+        <div class="po-head"><span>Better lighting & safety</span><span class="pct">20%</span></div>
+        <div class="po-bar"><div class="po-fill" style="width:20%"></div></div>
+      </div>
+      <div class="poll-foot">124 votes · Poll closes in 2d</div>
+    </div>
+  `);
+
+  $('#hiveFeed').innerHTML = feed.join('');
+
+  // Like toggle
+  $('#hiveFeed').querySelectorAll('[data-act="like"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('liked');
+      const isLiked = btn.classList.contains('liked');
+      const num = parseInt(btn.textContent.trim(), 10) || 0;
+      btn.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="${isLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        ${isLiked ? num + 1 : Math.max(0, num - 1)}
+      `;
+    });
+  });
+}
+
+// ---------------- Post Status modal ----------------
+let pendingSeats = null;
+$$('#seatSelector .seat-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $$('#seatSelector .seat-btn').forEach(b => b.classList.toggle('active', b === btn));
+    pendingSeats = parseInt(btn.dataset.seats, 10);
+  });
+});
+
+$('#postModal').addEventListener('click', (e) => {
+  if (e.target === $('#postModal')) closeModal('#postModal');
+});
+$('#postCancel').onclick = () => closeModal('#postModal');
+$('#postConfirm').onclick = () => {
+  const dest = $('#pDest').value.trim();
+  const routeStr = $('#pRoute').value.trim();
+  const fare = parseInt($('#pFare').value, 10) || 0;
+
+  if (!dest || !routeStr) { showToast('Fill destination and route'); return; }
+  if (pendingSeats === null) { showToast('Select seat availability'); return; }
+
+  const via = routeStr.split(',').map(s => s.trim()).filter(Boolean);
+  const from = via.shift() || 'Your location';
+  const total = 10;
+  const taken = total - pendingSeats;
+
+  // Try to get current position for the lane
+  const finish = (lat, lng) => {
+    const lane = {
+      id: 'lane-' + Date.now(),
+      driver: userName + ' (You)',
+      avatar: userName.substring(0, 2).toUpperCase(),
+      rating: 5.0,
+      route: { from, via: via.length ? via : ['Via Main'], to: dest },
+      seats: { total, taken },
+      fare,
+      status: 'live',
+      lat, lng,
+      peerId: 'steeradar-' + userName.toLowerCase().replace(/\s+/g,'-') + '-' + Math.random().toString(36).slice(2, 6)
+    };
+    lanes.push(lane);
+    saveLanes();
+    renderLanes();
+    renderBusMarkers();
+    showToast('Lane published! 🚌');
+    closeModal('#postModal');
+    // Switch to lanes tab
+    document.querySelector('[data-tab="lanes"]').click();
+  };
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => finish(pos.coords.latitude, pos.coords.longitude),
+      () => finish(12.9500 + (Math.random() - 0.5) * 0.05, 77.6500 + (Math.random() - 0.5) * 0.05),
+      { timeout: 5000 }
+    );
+  } else {
+    finish(12.9500, 77.6500);
+  }
+};
+
+// ---------------- Request modal ----------------
+let requestLane = null;
+function openRequest(lane) {
+  requestLane = lane;
+  $('#reqInfo').textContent = `To ${lane.driver} · ${lane.route.from} → ${lane.route.to} · ₹${lane.fare}`;
+  $('#reqMsg').value = '';
+  openModal('#requestModal');
+}
+$('#reqCancel').onclick = () => closeModal('#requestModal');
+$('#reqConfirm').onclick = () => {
+  if (!requestLane) return;
+  showToast(`Request sent to ${requestLane.driver}! ✓`);
+  closeModal('#requestModal');
+};
+
+// ---------------- Chat (PeerJS) ----------------
+function openChat(lane) {
+  activeChatLane = lane;
+  $('#chatAvatar').textContent = lane.avatar;
+  $('#chatName').textContent = lane.driver + ' · Lane';
+  $('#chatStatus').textContent = 'Connecting…';
+  $('#chatMessages').innerHTML = `
+    <div class="chat-msg them">
+      <div class="sender">${esc(lane.driver)}</div>
+      Welcome aboard! Ask me anything about the route.
+      <div class="time">${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div>
+    </div>
+  `;
+  openModal('#chatModal');
+
+  // Start PeerJS connection
+  startPeer(lane.peerId);
+}
+
+function startPeer(targetPeerId) {
+  if (peer) {
+    try { peer.destroy(); } catch (e) {}
+    peer = null;
+  }
+  peerConn = null;
+
+  const myId = 'steeradar-user-' + Math.random().toString(36).slice(2, 10);
+  peer = new Peer(myId, { debug: 1 });
+
+  peer.on('open', () => {
+    $('#chatStatus').textContent = 'Connecting to lane…';
+    const conn = peer.connect(targetPeerId, { reliable: true });
+    peerConn = conn;
+
+    conn.on('open', () => {
+      $('#chatStatus').textContent = 'Connected';
+    });
+    conn.on('data', (data) => {
+      if (data && data.type === 'chat') {
+        addChatBubble(data.text, data.sender || 'Peer', false);
+      }
+    });
+    conn.on('error', () => {
+      $('#chatStatus').textContent = 'Demo mode · Echo chat';
+    });
+    conn.on('close', () => {
+      $('#chatStatus').textContent = 'Peer offline';
+    });
+  });
+
+  peer.on('error', (err) => {
+    console.warn('Peer error:', err);
+    $('#chatStatus').textContent = 'Demo mode · Echo chat';
+  });
+}
+
+function addChatBubble(text, sender, isMe) {
+  const div = document.createElement('div');
+  div.className = 'chat-msg ' + (isMe ? 'me' : 'them');
+  const time = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  div.innerHTML = `
+    ${isMe ? '' : `<div class="sender">${esc(sender)}</div>`}
+    ${esc(text)}
+    <div class="time">${time}</div>
+  `;
+  $('#chatMessages').appendChild(div);
+  $('#chatMessages').scrollTop = $('#chatMessages').scrollHeight;
+}
+
+$('#chatSend').onclick = () => {
+  const text = $('#chatInput').value.trim();
+  if (!text) return;
+  addChatBubble(text, userName, true);
+  $('#chatInput').value = '';
+  if (peerConn && peerConn.open) {
+    try { peerConn.send({ type: 'chat', text, sender: userName }); } catch (e) {}
+  }
+};
+$('#chatInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') $('#chatSend').click();
+});
+$('#chatClose').onclick = () => {
+  if (peerConn) try { peerConn.close(); } catch(e) {}
+  if (peer) try { peer.destroy(); } catch(e) {}
+  peerConn = null; peer = null;
+  closeModal('#chatModal');
+};
+
+// ---------------- Modal helpers ----------------
+function openModal(sel) { $(sel).classList.add('active'); }
+function closeModal(sel) { $(sel).classList.remove('active'); }
+
+// ---------------- FAB ----------------
+$('#fabBtn').addEventListener('click', () => {
+  if (currentTab === 'pulse' || currentTab === 'lanes') {
+    $('#pDest').value = '';
+    $('#pRoute').value = '';
+    $('#pFare').value = '20';
+    pendingSeats = null;
+    $$('#seatSelector .seat-btn').forEach(b => b.classList.remove('active'));
+    openModal('#postModal');
+  } else if (currentTab === 'near') {
+    showToast('You are now visible nearby ✓');
+  } else {
+    showToast('Composer coming soon');
+  }
+});
+
+// ---------------- Notification & Avatar ----------------
+$('#notifBtn').addEventListener('click', () => showToast('No new notifications'));
+$('#avatarBtn').addEventListener('click', () => {
+  const name = prompt('Your display name:', userName);
+  if (name && name.trim()) {
+    userName = name.trim();
+    localStorage.setItem('steeradar-name', userName);
+    $('#avatarBtn').textContent = userName.charAt(0).toUpperCase();
+    renderNear();
+    showToast('Saved as ' + userName);
+  }
+});
+
+// ---------------- Location pill tap ----------------
+$('#locationPill').addEventListener('click', () => {
+  if (!navigator.geolocation) { showToast('Location not available'); return; }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const { latitude, longitude } = pos.coords;
+      if (map) map.setView([latitude, longitude], 14);
+      if (userMarker) map.removeLayer(userMarker);
+      userMarker = L.marker([latitude, longitude], {
+        icon: L.divIcon({ className: '', html: '<div class="user-marker-wrap"></div>', iconSize: [22,22], iconAnchor: [11,11] })
+      }).addTo(map);
+      reverseGeocode(latitude, longitude);
+      showToast('Location updated');
+    },
+    () => showToast('Enable location to update')
+  );
+});
+
+// ---------------- Init ----------------
+function init() {
+  $('#avatarBtn').textContent = userName.charAt(0).toUpperCase();
+  initMap();
+  renderLanes();
+  renderNear();
+  renderHive();
+  updateFab();
+}
+
+// Wait for DOM + Leaflet loaded
+if (document.readyState === 'complete') init();
+else window.addEventListener('load', init);
+
+// Handle PeerJS script not loading gracefully
+window.addEventListener('error', (e) => {
+  if (e.filename && e.filename.includes('peerjs')) {
+    console.warn('PeerJS failed to load — chat will run in demo mode');
+  }
+}, true);
+
+console.log('%c STEERADAR ', 'background:#00E5C3;color:#0F1115;font-weight:800;padding:4px 10px;border-radius:4px;font-family:sans-serif', 'Community rides — ready');
+</script>
+</body>
+</html>
