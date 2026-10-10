@@ -1,38 +1,28 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#0F1115">
+<meta name="theme-color" content="#F7F8FC">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="description" content="Steeradar — live community rides, peer chat, local mesh, Bluetooth proximity.">
 <title>Steeradar — Live Community Rides</title>
 
-<!-- Favicon -->
 <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/suryasticsai/Steeradar/main/steerardar-logo.png">
-
-<!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-
-<!-- MapLibre GL (for OpenFreeMap vector tiles) -->
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-
-<!-- App styles -->
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="./styles.css">
 </head>
 <body>
 
-<!-- ============ Onboarding Gate ============ -->
+<!-- Onboarding -->
 <div id="onboardGate">
   <div class="onboard-logo">
-    <img
-      src="https://raw.githubusercontent.com/suryasticsai/Steeradar/main/steerardar-logo.png"
-      alt="Steeradar"
-      onerror="this.style.display='none';this.parentNode.innerHTML='<svg width=\'70\' height=\'70\' viewBox=\'0 0 32 32\' fill=\'none\'><circle cx=\'16\' cy=\'16\' r=\'13\' stroke=\'%2300E5C3\' stroke-width=\'2\'/><circle cx=\'16\' cy=\'16\' r=\'4\' fill=\'%2300E5C3\'/><path d=\'M16 3v9M16 20v9M3 16h9M20 16h9\' stroke=\'%2300E5C3\' stroke-width=\'1.6\' stroke-linecap=\'round\' opacity=\'0.6\'/><circle cx=\'24\' cy=\'8\' r=\'2.5\' fill=\'%23FF6B4A\'/></svg>'">
+    <img src="https://raw.githubusercontent.com/suryasticsai/Steeradar/main/steerardar-logo.png" alt="Steeradar"
+      onerror="this.style.display='none';this.parentNode.innerHTML='<svg width=\'70\' height=\'70\' viewBox=\'0 0 32 32\' fill=\'none\'><circle cx=\'16\' cy=\'16\' r=\'13\' stroke=\'%2300B39A\' stroke-width=\'2\'/><circle cx=\'16\' cy=\'16\' r=\'4\' fill=\'%2300B39A\'/></svg>'">
   </div>
   <h1 class="onboard-title"><span class="steer">Steer</span><span class="adar">adar</span><span class="dot">.</span></h1>
   <p class="onboard-tagline">Live community rides. Enter your vehicle to unlock.</p>
-
   <div class="onboard-card">
     <div class="oc-label">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 12h18M8 6V4M16 6V4"/></svg>
@@ -51,25 +41,21 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
     </button>
   </div>
-
   <div class="oc-features">
     <div class="oc-feature"><div class="ic">📍</div>Live map</div>
     <div class="oc-feature"><div class="ic">💬</div>Peer chat</div>
     <div class="oc-feature"><div class="ic">📡</div>BT local</div>
     <div class="oc-feature"><div class="ic">🤖</div>RAGina AI</div>
   </div>
-
   <p class="onboard-foot">Your vehicle number is stored locally and used as your Steeradar identity. Nothing is sent to a server.</p>
 </div>
 
-<!-- ============ Main App ============ -->
+<!-- Main app -->
 <div id="app">
   <header>
     <div class="logo">
-      <img class="logo-img"
-        src="https://raw.githubusercontent.com/suryasticsai/Steeradar/main/steerardar-logo.png"
-        alt="Steeradar"
-        onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<svg width=\'32\' height=\'32\' viewBox=\'0 0 32 32\' fill=\'none\'><circle cx=\'16\' cy=\'16\' r=\'13\' stroke=\'%2300E5C3\' stroke-width=\'2\'/><circle cx=\'16\' cy=\'16\' r=\'4\' fill=\'%2300E5C3\'/></svg>')">
+      <img class="logo-img" src="https://raw.githubusercontent.com/suryasticsai/Steeradar/main/steerardar-logo.png" alt="Steeradar"
+        onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<svg width=\'32\' height=\'32\' viewBox=\'0 0 32 32\' fill=\'none\'><circle cx=\'16\' cy=\'16\' r=\'13\' stroke=\'%2300B39A\' stroke-width=\'2\'/><circle cx=\'16\' cy=\'16\' r=\'4\' fill=\'%2300B39A\'/></svg>')">
       <div class="logo-text"><span>Steer</span><span class="adar">adar</span><span class="dot">.</span></div>
     </div>
     <div class="header-actions">
@@ -89,6 +75,12 @@
     <!-- Pulse -->
     <div id="pulseView" class="view active">
       <div id="map"></div>
+      <button class="map-refresh" id="mapRefresh" title="Refresh map">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12a9 9 0 1 1-3-6.7L21 8"/>
+          <path d="M21 3v5h-5"/>
+        </svg>
+      </button>
       <div class="pulse-overlay">
         <div class="location-pill" id="locationPill">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -121,7 +113,6 @@
         <h2>Near</h2>
         <p>Vehicles and people around you</p>
       </div>
-
       <div class="local-room-banner" id="localRoomBanner">
         <div class="lrb-head">
           <div class="lrb-icon">📡</div>
@@ -136,9 +127,7 @@
         </div>
         <div class="lrb-room">Room: <span id="localRoomId">—</span></div>
       </div>
-
       <div class="proximity-wrap" id="proximityWrap"></div>
-
       <div class="section-label">Bluetooth nearby</div>
       <div class="bt-panel">
         <div class="bt-head">
@@ -150,7 +139,6 @@
         </div>
         <div id="btDevices"><div class="bt-empty">Tap Scan to discover nearby Bluetooth devices</div></div>
       </div>
-
       <div class="section-label">Local chat rooms <span class="see-all" id="chatRoomsCount"></span></div>
       <div id="roomList"></div>
     </div>
@@ -162,7 +150,7 @@
       <div class="greeting-card">
         <h3 id="greetingText">Good evening 👋</h3>
         <p>Here's what's happening in your community.</p>
-        <span class="tag" id="hiveTag">Greenwood Heights</span>
+        <span class="tag">Greenwood Heights</span>
       </div>
       <div class="section-label">Local posts</div>
       <div id="hiveFeed"></div>
@@ -177,11 +165,6 @@
     </span>
   </button>
 
-  <button class="ai-fab" id="aiFab" title="Ask RAGina">
-    <span class="ai-pulse"></span>
-    🤖
-  </button>
-
   <nav class="bottom-nav">
     <button class="nav-item active" data-tab="pulse"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Pulse</button>
     <button class="nav-item" data-tab="lanes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 12h18M8 6V4M16 6V4"/><circle cx="8" cy="16" r="1.2" fill="currentColor"/><circle cx="16" cy="16" r="1.2" fill="currentColor"/></svg>Lanes</button>
@@ -190,7 +173,7 @@
   </nav>
 </div>
 
-<!-- ============ Modals ============ -->
+<!-- Modals -->
 <div class="modal-overlay" id="postModal"><div class="modal">
   <div class="handle"></div><h3>Post your lane</h3>
   <label>Destination</label><input type="text" id="pDest" placeholder="e.g. Downtown Central">
@@ -234,25 +217,97 @@
   </div>
 </div></div>
 
-<div class="modal-overlay" id="vehicleModal"><div class="modal">
-  <div class="handle"></div><h3>Change vehicle</h3>
-  <label>Vehicle number</label>
-  <input type="text" id="changeVehicleInput" placeholder="KA01AB1234" maxlength="15" autocapitalize="characters">
-  <p style="font-size:.75rem;color:var(--text-3);margin-bottom:14px">Changing vehicle resets your published lanes on this device.</p>
-  <button class="btn-primary" id="changeVehicleBtn">Save vehicle</button>
-  <button class="btn-secondary" id="changeVehicleCancel">Cancel</button>
+<!-- Settings -->
+<div class="modal-overlay" id="settingsModal"><div class="modal" style="max-height:90vh">
+  <div class="handle"></div>
+  <h3>Settings</h3>
+
+  <div class="settings-section">
+    <div class="settings-label">Profile</div>
+    <input type="text" id="setName" placeholder="Your display name">
+    <div class="vehicle-input-wrap" style="margin-top:8px">
+      <input type="text" id="setVehicle" placeholder="Vehicle number" maxlength="15" autocapitalize="characters">
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-label">Appearance</div>
+    <div class="settings-row">
+      <span>Theme</span>
+      <div class="segmented" id="setTheme">
+        <button data-value="light" class="active">Light</button>
+        <button data-value="dark">Dark</button>
+      </div>
+    </div>
+    <div class="settings-row">
+      <span>Map style</span>
+      <div class="segmented" id="setMapStyle">
+        <button data-value="bright" class="active">Bright</button>
+        <button data-value="dark">Dark</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-label">Notifications</div>
+    <div class="settings-row"><span>Chat messages</span><label class="switch"><input type="checkbox" id="setNotifChat" checked><span></span></label></div>
+    <div class="settings-row"><span>Seat requests</span><label class="switch"><input type="checkbox" id="setNotifSeats" checked><span></span></label></div>
+    <div class="settings-row"><span>Nearby alerts</span><label class="switch"><input type="checkbox" id="setNotifNear"><span></span></label></div>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-label">Privacy</div>
+    <div class="settings-row"><span>Share exact GPS with peers</span><label class="switch"><input type="checkbox" id="setShareGps" checked><span></span></label></div>
+    <div class="settings-row"><span>Visible in local mesh</span><label class="switch"><input type="checkbox" id="setVisible" checked><span></span></label></div>
+    <div class="settings-row"><span>Ghost mode (hide from map)</span><label class="switch"><input type="checkbox" id="setGhost"><span></span></label></div>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-label">Cloud sync (Apps Script)</div>
+    <div class="settings-row"><span>Enable cloud sync</span><label class="switch"><input type="checkbox" id="setCloudSync"><span></span></label></div>
+    <input type="text" id="setCloudUrl" placeholder="Apps Script web app URL" style="margin-top:8px">
+    <input type="text" id="setCloudKey" placeholder="Secret key" style="margin-top:8px">
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-label">Data</div>
+    <div class="settings-row"><span>Clear my published lanes</span><button class="btn-sm-danger" id="setClearLanes">Clear</button></div>
+    <div class="settings-row"><span>Reset all data</span><button class="btn-sm-danger" id="setResetAll">Reset</button></div>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-label">About</div>
+    <p style="font-size:0.78rem;color:var(--text-2);line-height:1.5">
+      Steeradar v2.0 · Vanilla JS · No backend · MIT License<br>
+      Made by <a href="https://github.com/suryasticsai" target="_blank">@suryasticsai</a>
+    </p>
+  </div>
+
+  <button class="btn-primary" id="settingsSave">Save & close</button>
 </div></div>
+
+<!-- Custom dialog (replaces alert/confirm/prompt) -->
+<div class="dialog-overlay" id="dialogOverlay">
+  <div class="dialog">
+    <h3 id="dialogTitle">Confirm</h3>
+    <p id="dialogMsg"></p>
+    <input type="text" id="dialogInput" style="display:none">
+    <div class="dialog-actions">
+      <button class="btn-cancel" id="dialogCancel">Cancel</button>
+      <button class="btn-ok" id="dialogOk">OK</button>
+    </div>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
-<!-- ============ CDN Libraries (order matters) ============ -->
+<!-- CDN libraries -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.22/leaflet-maplibre-gl.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/suryasticsai/RAGina@main/ragina-pro.js"></script>
 
-<!-- App logic -->
-<script src="app.js"></script>
+<script src="./app.js"></script>
 </body>
 </html>
