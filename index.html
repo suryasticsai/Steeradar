@@ -349,6 +349,30 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
+<!-- HIVE COMPOSE MODAL (heading + body + tags)                  -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="hiveComposeModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>New post</h3>
+      <button class="modal-close" data-close="#hiveComposeModal">✕</button>
+    </div>
+
+    <label>Heading</label>
+    <input type="text" id="hiveHeading" placeholder="A short headline (optional)" maxlength="80">
+
+    <label>Body</label>
+    <textarea id="hiveBody" placeholder="What do you want to share with your community?" rows="6" maxlength="2000"></textarea>
+
+    <label>Tags (comma separated, optional)</label>
+    <input type="text" id="hiveTags" placeholder="e.g. traffic, cricket, route12" autocomplete="off">
+
+    <button class="btn-primary" id="hiveComposeSubmit" style="margin-top:12px">Post to Hive</button>
+    <button class="btn-secondary" id="hiveComposeCancel" style="margin-top:8px">Cancel</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
 <!-- SETTINGS MODAL                                              -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div class="modal-overlay" id="settingsModal">
@@ -525,29 +549,69 @@
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
-<!-- APP CONFIG + MODULES                                        -->
+<!-- APP CONFIG + LEGACY SCRIPT                                  -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <script src="./config.js"></script>
 
-<!-- Legacy app — replaced once modules are wired -->
+<!-- Legacy app — still runs the UI until js/app.js takes over -->
 <script src="./app.js"></script>
 
-<!-- Expose module loaders for gradual migration -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- MODULAR MODULES + BRIDGE                                    -->
+<!-- ═══════════════════════════════════════════════════════════ -->
 <script type="module">
-  // Once js/app.js is ready, the two lines above will be replaced by:
-  //   <script type="module" src="./js/app.js"></script>
-  // Until then, we just expose the modular pieces to the legacy app.
   import { api } from './js/api.js';
   import { state, storage, session, showToast } from './js/store.js';
   import { setupPhotoUploads } from './js/photos.js';
   import { initOnboarding, getPhotos, resetOnboarding } from './js/onboarding.js';
   import { initAuth, openAuthSheet, logout, validateSessionOnBoot } from './js/auth.js';
+  import { lanes } from './js/lanes.js';
+  import { chat } from './js/chat.js';
+  import { hive } from './js/hive.js';
+  import { presence } from './js/presence.js';
 
+  // ─── Bridge: route incoming peer messages → chat module ───
+  presence.onPeerMessage((text, sender, roomId) => {
+    chat.receive(text, sender, roomId);
+  });
+
+  // ─── Bridge: hive broadcasts received over the mesh ───
+  window.addEventListener('steeradar:hive-broadcast', (e) => {
+    const post = e.detail;
+    if (!post || !post.id) return;
+    if (state.hivePosts.find(p => p.id === post.id)) return;
+    state.hivePosts.push(post);
+    hive.render();
+  });
+
+  // ─── Expose everything to the legacy app ───
   window.Steeradar = {
     api, state, storage, session, showToast,
-    setupPhotoUploads, initOnboarding, getPhotos, resetOnboarding,
-    initAuth, openAuthSheet, logout, validateSessionOnBoot,
+    setupPhotoUploads,
+
+    onboarding: { init: initOnboarding, getPhotos, reset: resetOnboarding },
+    auth:       { init: initAuth, open: openAuthSheet, logout, validate: validateSessionOnBoot },
+
+    lanes,
+    chat,
+    hive,
+    presence,
+
+    // Convenience aliases used by other modules
+    openChatForLane:    (lane) => chat.openLane(lane),
+    startRouteTracking: (t)    => presence.startTracking(t),
+    broadcastToAllPeers: (p)   => presence.broadcast(p),
   };
+
+  // ─── Auto-init the modules that don't need to wait for boot ───
+  chat.init();
+  hive.init();
+
+  console.log(
+    '%c Steeradar modules ready ',
+    'background:#0D9488;color:#fff;font-weight:700;padding:4px 8px;border-radius:4px',
+    { api, state, lanes, chat, hive, presence }
+  );
 </script>
 
 </body>
