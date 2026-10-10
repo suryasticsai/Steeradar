@@ -221,7 +221,7 @@
     <span class="fab-icon">+</span>
     <span class="fab-text">
       <span id="fabLabel">Post my lane</span>
-      <span class="fab-sub" id="fabSub">Share seats &amp; route</span>
+      <span class="fab-sub">Share seats &amp; route</span>
     </span>
   </button>
 
@@ -549,68 +549,33 @@
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
-<!-- APP CONFIG + LEGACY SCRIPT                                  -->
+<!-- CONFIG + MODULAR BOOT                                       -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <script src="./config.js"></script>
+<script type="module" src="./js/app.js"></script>
 
-<!-- Legacy app — still runs the UI until js/app.js takes over -->
-<script src="./app.js"></script>
-
-<!-- ═══════════════════════════════════════════════════════════ -->
-<!-- MODULAR MODULES + BRIDGE                                    -->
-<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Debug bridge (optional — safe to remove later) -->
 <script type="module">
   import { api } from './js/api.js';
   import { state, storage, session, showToast } from './js/store.js';
   import { setupPhotoUploads } from './js/photos.js';
-  import { initOnboarding, getPhotos, resetOnboarding } from './js/onboarding.js';
-  import { initAuth, openAuthSheet, logout, validateSessionOnBoot } from './js/auth.js';
   import { lanes } from './js/lanes.js';
   import { chat } from './js/chat.js';
   import { hive } from './js/hive.js';
   import { presence } from './js/presence.js';
 
-  // ─── Bridge: route incoming peer messages → chat module ───
-  presence.onPeerMessage((text, sender, roomId) => {
-    chat.receive(text, sender, roomId);
-  });
-
-  // ─── Bridge: hive broadcasts received over the mesh ───
-  window.addEventListener('steeradar:hive-broadcast', (e) => {
-    const post = e.detail;
-    if (!post || !post.id) return;
-    if (state.hivePosts.find(p => p.id === post.id)) return;
-    state.hivePosts.push(post);
-    hive.render();
-  });
-
-  // ─── Expose everything to the legacy app ───
   window.Steeradar = {
     api, state, storage, session, showToast,
     setupPhotoUploads,
-
-    onboarding: { init: initOnboarding, getPhotos, reset: resetOnboarding },
-    auth:       { init: initAuth, open: openAuthSheet, logout, validate: validateSessionOnBoot },
-
-    lanes,
-    chat,
-    hive,
-    presence,
-
-    // Convenience aliases used by other modules
-    openChatForLane:    (lane) => chat.openLane(lane),
-    startRouteTracking: (t)    => presence.startTracking(t),
-    broadcastToAllPeers: (p)   => presence.broadcast(p),
+    lanes, chat, hive, presence,
+    broadcastToAllPeers: presence.broadcast,
+    startRouteTracking: presence.startTracking,
+    openChatForLane: chat.openLane,
   };
-
-  // ─── Auto-init the modules that don't need to wait for boot ───
-  chat.init();
-  hive.init();
 
   console.log(
     '%c Steeradar modules ready ',
-    'background:#0D9488;color:#fff;font-weight:700;padding:4px 8px;border-radius:4px',
-    { api, state, lanes, chat, hive, presence }
+    'background:#0D9488;color:#fff;font-weight:700;padding:4px 8px;border-radius:4px'
   );
 </script>
 
