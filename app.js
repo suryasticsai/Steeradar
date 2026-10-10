@@ -1,20 +1,26 @@
 /* ============================================================
-   STEERADAR v3 — Universal DB + Deepstash UI + bug fixes
+   STEERADAR v3 — Universal DB · Deepstash UI · clean interactions
    ============================================================ */
 
 (() => {
 'use strict';
 
-// ---------------- Helpers ----------------
+// ============================================================
+//  CONFIG (from config.js — loaded before this script)
+// ============================================================
+const CFG = window.STEERADAR || {};
+const APP_NAME = CFG.APP_NAME || 'Steeradar';
+
+// ---------------- Utilities ----------------
 const $  = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 }[c]));
 
-// Toast — fixed, single-instance, clean variant
+// Toast — single timer, no leaks
 let _toastTimer = null;
-const showToast = (msg, variant = '', duration = 2200) => {
+const showToast = (msg, variant = '', duration = CFG.TOAST_DURATION_MS || 2200) => {
   const t = $('#toast');
   if (!t) return;
   t.textContent = msg;
@@ -46,8 +52,9 @@ function openDialog({ title, message = '', input = null, okText = 'OK', cancelTe
     const okBtn = $('#dialogOk');
     okBtn.textContent = okText;
     okBtn.className = danger ? 'btn-danger' : 'btn-ok';
-    $('#dialogCancel').style.display = cancelText ? 'block' : 'none';
-    $('#dialogCancel').textContent = cancelText || 'Cancel';
+    const cancelBtn = $('#dialogCancel');
+    cancelBtn.style.display = cancelText ? 'block' : 'none';
+    cancelBtn.textContent = cancelText || 'Cancel';
     $('#dialogOverlay').classList.add('active');
   });
 }
@@ -60,7 +67,7 @@ function closeDialog(result) {
   }
 }
 const confirmDialog = (title, message, danger = false) => openDialog({ title, message, okText: 'Confirm', danger });
-const promptDialog = (title, defaultValue = '', placeholder = '') => openDialog({ title, input: placeholder || defaultValue });
+const promptDialog  = (title, defaultValue = '', placeholder = '') => openDialog({ title, input: placeholder || defaultValue });
 
 const validateVehicle = (v) => /^[A-Z0-9]{4,15}$/i.test(v.replace(/[\s-]/g, ''));
 const normalizeVehicle = (v) => v.replace(/[\s-]/g, '').toUpperCase();
@@ -74,7 +81,7 @@ function distanceM(a, b) {
 }
 
 const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz';
-function geohash(lat, lng, precision = 6) {
+function geohash(lat, lng, precision = CFG.GEOHASH_PRECISION || 6) {
   let latR = [-90, 90], lngR = [-180, 180], hash = '', bit = 0, ch = 0, even = true;
   while (hash.length < precision) {
     if (even) { const m = (lngR[0] + lngR[1]) / 2; if (lng >= m) { ch = (ch << 1) + 1; lngR[0] = m; } else { ch = ch << 1; lngR[1] = m; } }
@@ -88,8 +95,8 @@ function geohash(lat, lng, precision = 6) {
 // ---------------- Theme ----------------
 function getMapStyle() {
   const pref = localStorage.getItem('steeradar-map-style') || 'bright';
-  if (pref === 'dark') return 'https://tiles.openfreemap.org/styles/dark';
-  return 'https://tiles.openfreemap.org/styles/bright';
+  if (pref === 'dark') return CFG.MAP_STYLE_DARK   || 'https://tiles.openfreemap.org/styles/dark';
+  return                     CFG.MAP_STYLE_BRIGHT || 'https://tiles.openfreemap.org/styles/bright';
 }
 
 function applyTheme(mode) {
@@ -104,9 +111,7 @@ function applyTheme(mode) {
 
 function refreshMapStyle() {
   if (!state.map) return;
-  if (state.mapLibreLayer) {
-    try { state.map.removeLayer(state.mapLibreLayer); } catch {}
-  }
+  if (state.mapLibreLayer) { try { state.map.removeLayer(state.mapLibreLayer); } catch {} }
   state.mapLibreLayer = L.maplibreGL({ style: getMapStyle(), interactive: false }).addTo(state.map);
   state.mapLibreLayer.bringToBack();
 }
@@ -136,11 +141,16 @@ const state = {
   cloudSyncTimer: null
 };
 
-// ---------------- Cloud (Apps Script) ----------------
+// ---------------- Cloud (Apps Script, reads config.js) ----------------
 const cloud = {
-  url: localStorage.getItem('steeradar-cloud-url') || '',
-  key: localStorage.getItem('steeradar-cloud-key') || '',
-  enabled: localStorage.getItem('steeradar-cloud-enabled') === 'true',
+  url: localStorage.getItem('steeradar-cloud-url') || CFG.SHEET_API_URL || '',
+  key: localStorage.getItem('steeradar-cloud-key') || CFG.SHEET_WEBHOOK_SECRET || '',
+  enabled: (() => {
+    const ls = localStorage.getItem('steeradar-cloud-enabled');
+    if (ls === 'true')  return true;
+    if (ls === 'false') return false;
+    return CFG.CLOUD_SYNC_DEFAULT === true && !!CFG.SHEET_API_URL;
+  })(),
 
   async call(action, params = {}) {
     if (!this.url || !this.enabled) return null;
@@ -157,10 +167,15 @@ const cloud = {
   },
 
   async fetchLanes() { return (await this.call('list', { sheet: 'lanes' })) || []; },
-  async fetchHive() { return (await this.call('list', { sheet: 'hive' })) || []; },
+  async fetchHive()  { return (await this.call('list', { sheet: 'hive' }))  || []; },
   async pushLane(lane) { if (lane.mine) this.call('insert', { sheet: 'lanes', row: lane }); },
   async pushHive(post) { this.call('insert', { sheet: 'hive', row: post }); },
-  async removeLane(id) { this.call('delete', { sheet: 'lanes', id }); }
+  async removeLane(id) { this.call('delete', { sheet: 'lanes', id }); },
+
+  async test() {
+    const r = await this.call('ping');
+    return r === 'pong';
+  }
 };
 
 async function syncFromCloud(silent = true) {
@@ -168,17 +183,10 @@ async function syncFromCloud(silent = true) {
   if (!silent) showToast('Syncing…');
   const [cLanes, cHive] = await Promise.all([cloud.fetchLanes(), cloud.fetchHive()]);
 
-  // Merge lanes — cloud rows are authoritative, mark local-only as mine
-  const cloudIds = new Set((cLanes || []).map(l => l.id));
+  // Merge lanes
   const mineLocal = state.lanes.filter(l => l.mine);
-  const merged = [];
-
-  // Add mine first (local, then overlay cloud version if exists)
-  mineLocal.forEach(l => merged.push(l));
-
-  // Add cloud lanes (not ours or ours-with-same-id)
+  const merged = [...mineLocal];
   (cLanes || []).forEach(l => {
-    const left = Number(l.total) - Number(l.taken);
     const lane = {
       id: String(l.id),
       driver: l.driver,
@@ -199,10 +207,8 @@ async function syncFromCloud(silent = true) {
       mine: l.vehicle === state.vehicle,
       ts: Number(l.ts) || Date.now()
     };
-    // Skip if we already have it as mine
     if (!merged.find(m => m.id === lane.id)) merged.push(lane);
   });
-
   state.lanes = merged;
 
   // Merge hive
@@ -224,6 +230,15 @@ async function syncFromCloud(silent = true) {
   });
 
   renderLanes(); renderBusMarkers(); renderNear(); renderHive();
+}
+
+function startCloudPolling() {
+  clearInterval(state.cloudSyncTimer);
+  if (!cloud.enabled) return;
+  state.cloudSyncTimer = setInterval(
+    () => syncFromCloud(true),
+    CFG.CLOUD_POLL_INTERVAL_MS || 15000
+  );
 }
 
 // ---------------- Onboarding ----------------
@@ -297,6 +312,7 @@ function initPeer() {
   const id = 'steeradar-veh-' + state.vehicle;
   state.peerId = id;
   try { state.peer = new Peer(id, { debug: 0 }); } catch { updateConnBadge(false, 'Signaling error'); return; }
+
   state.peer.on('open', () => updateConnBadge(true, 'Online'));
   state.peer.on('connection', (conn) => {
     conn.on('open', () => { state.connections.set(conn.peer, conn); attachConnHandlers(conn); });
@@ -322,7 +338,7 @@ function attachConnHandlers(conn) {
     if (!data || typeof data !== 'object') return;
     if (data.type === 'chat') {
       addChatBubble(data.text, data.sender || 'Peer', false);
-      notify('Steeradar', data.sender + ': ' + data.text);
+      notify(APP_NAME, data.sender + ': ' + data.text);
     } else if (data.type === 'hive-post') {
       if (!state.hivePosts.find(p => p.id === data.post.id)) {
         state.hivePosts.push(data.post);
@@ -349,11 +365,11 @@ function notify(title, body) {
   if (!('Notification' in window)) return;
   if (Notification.permission !== 'granted') return;
   if (localStorage.getItem('steeradar-notif-chat') === 'false') return;
-  try { new Notification(title, { body, icon: 'https://raw.githubusercontent.com/suryasticsai/Steeradar/main/steerardar-logo.png' }); } catch {}
+  try { new Notification(title, { body, icon: CFG.LOGO_URL }); } catch {}
 }
 
 // ---------------- Local mesh ----------------
-const LOCAL_ROOM_SLOTS = 20;
+const LOCAL_ROOM_SLOTS = CFG.LOCAL_ROOM_SLOTS || 20;
 let localRescanTimer = null;
 
 async function initLocalRoom(lat, lng) {
@@ -427,7 +443,7 @@ function attachLocalConn(conn) {
       showToast('👋 ' + info.name + ' joined the local room');
     } else if (data.type === 'chat') {
       addChatBubble(data.text, data.sender || 'Local', false);
-      notify('Steeradar Local', (data.sender || 'Neighbour') + ': ' + data.text);
+      notify(APP_NAME + ' Local', (data.sender || 'Neighbour') + ': ' + data.text);
     } else if (data.type === 'hive-post') {
       if (!state.hivePosts.find(p => p.id === data.post.id)) {
         state.hivePosts.push(data.post);
@@ -800,11 +816,10 @@ function openLocalChat(peerId) {
   openModal('#chatModal');
 }
 
-// ---------------- Hive (Deepstash-style) ----------------
+// ---------------- Hive ----------------
 function renderHive() {
   dedupeHive();
 
-  // Stories
   const seenDrivers = new Set();
   const driverStories = [];
   for (const lane of state.lanes) {
@@ -863,7 +878,6 @@ function renderHive() {
   }
   $('#hiveFeed').innerHTML = feed.join('');
 
-  // Tap post → detail
   $('#hiveFeed').querySelectorAll('.post-card').forEach(card => {
     card.addEventListener('click', (e) => {
       if (e.target.closest('[data-act="like"]')) return;
@@ -872,7 +886,6 @@ function renderHive() {
     });
   });
 
-  // Like toggle — one like per user
   $('#hiveFeed').querySelectorAll('[data-act="like"]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -904,9 +917,9 @@ function showPostDetail(post) {
     </div>
     ${post.title ? `<h2>${esc(post.title)}</h2>` : ''}
     <div class="pd-body">${esc(post.text).replace(/\n/g, '<br>')}</div>
-    ${post.tags && post.tags.length ? `<div class="post-tags" style="margin-bottom:16px">${post.tags.map(t => `<span class="post-tag">${esc(t)}</span>`).join('')}</div>` : ''}
+    ${post.tags && post.tags.length ? `<div class="post-tags" style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">${post.tags.map(t => `<span class="post-tag">${esc(t)}</span>`).join('')}</div>` : ''}
     <div class="pd-actions">
-      <button class="pa-btn ${liked ? 'liked' : ''}" id="pdLike">
+      <button class="pa-btn ${liked ? 'liked' : ''}" id="pdLike" style="display:flex;align-items:center;gap:6px;font-weight:600;color:${liked ? 'var(--coral)' : 'var(--text-2)'}">
         <svg viewBox="0 0 24 24" fill="${liked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
         <span>${post.likes || 0}</span>
       </button>
@@ -943,7 +956,12 @@ function publishHivePost(title, text, tags) {
   state.hivePosts.push(post);
   saveHive();
   const sent = broadcastToAllPeers({ type: 'hive-post', post });
-  if (cloud.enabled) cloud.pushHive({ id: post.id, name: post.name, avatar: post.avatar, title: post.title, text: post.text, tags: post.tags.join('|'), time: post.time, likes: 0, ts: post.ts });
+  if (cloud.enabled) cloud.pushHive({
+    id: post.id, name: post.name, avatar: post.avatar,
+    title: post.title, text: post.text,
+    tags: post.tags.join('|'), time: post.time,
+    likes: 0, ts: post.ts
+  });
   renderHive();
   showToast(sent > 0 ? `Posted · reached ${sent} peer${sent === 1 ? '' : 's'} 🐝` : 'Posted to Hive 🐝', 'success');
 }
@@ -982,7 +1000,6 @@ function initPostModal() {
     const from = via.shift() || 'Your location';
     const total = 10, taken = total - pendingSeats;
     const finish = (lat, lng) => {
-      // Remove my previous lane with same destination
       state.lanes = state.lanes.filter(l => !(l.mine && l.route.to === dest));
       const lane = {
         id: 'mine-' + Date.now(),
@@ -997,13 +1014,11 @@ function initPostModal() {
       };
       state.lanes.unshift(lane);
       saveLanes();
-      if (cloud.enabled) {
-        cloud.pushLane({
-          id: lane.id, driver: lane.driver, vehicle: state.vehicle,
-          from: lane.route.from, via: lane.route.via.join('|'), to: lane.route.to,
-          total, taken, fare, lat, lng, status: 'live', ts: lane.ts
-        });
-      }
+      if (cloud.enabled) cloud.pushLane({
+        id: lane.id, driver: lane.driver, vehicle: state.vehicle,
+        from: lane.route.from, via: lane.route.via.join('|'), to: lane.route.to,
+        total, taken, fare, lat, lng, status: 'live', ts: lane.ts
+      });
       renderLanes(); renderBusMarkers(); renderNear(); renderHive();
       showToast('Lane is live! 🚌', 'success');
       closeModal('#postModal');
@@ -1116,15 +1131,21 @@ function initChatModal() {
 }
 
 // ---------------- Settings ----------------
+function updateCloudStatus(text, cls) {
+  const el = $('#cloudStatus');
+  el.textContent = text;
+  el.className = 'cloud-status' + (cls ? ' ' + cls : '');
+}
+
 function initSettings() {
   $('#avatarBtn').onclick = () => openSettings();
   $('#vehicleBadge').onclick = () => openSettings();
   $('#settingsSave').onclick = saveSettings;
 
-  // Live theme preview
+  // Live theme preview — applies instantly on tap
   $$('#setTheme button').forEach(b => b.addEventListener('click', () => {
     $$('#setTheme button').forEach(x => x.classList.toggle('active', x === b));
-    applyTheme(b.dataset.value); // live
+    applyTheme(b.dataset.value);
   }));
   $$('#setMapStyle button').forEach(b => b.addEventListener('click', () => {
     $$('#setMapStyle button').forEach(x => x.classList.toggle('active', x === b));
@@ -1132,17 +1153,31 @@ function initSettings() {
     refreshMapStyle();
   }));
 
+  $('#cloudTest').onclick = async () => {
+    const url = $('#setCloudUrl').value.trim();
+    const key = $('#setCloudKey').value.trim();
+    if (!url) { updateCloudStatus('Enter a URL first', 'err'); return; }
+    updateCloudStatus('Testing…');
+    const savedUrl = cloud.url, savedKey = cloud.key, savedEnabled = cloud.enabled;
+    cloud.url = url; cloud.key = key; cloud.enabled = true;
+    const ok = await cloud.test();
+    cloud.url = savedUrl; cloud.key = savedKey; cloud.enabled = savedEnabled;
+    if (ok) updateCloudStatus('✓ Connected', 'ok');
+    else updateCloudStatus('✗ Failed — check URL & key', 'err');
+  };
+
   $('#setClearLanes').onclick = async () => {
     const ok = await confirmDialog('Clear my lanes?', 'Delete all your published lanes on this device?', true);
     if (!ok) return;
-    state.lanes.filter(l => l.mine).forEach(l => { if (cloud.enabled) cloud.removeLane(l.id); });
+    if (cloud.enabled) state.lanes.filter(l => l.mine).forEach(l => cloud.removeLane(l.id));
     state.lanes = state.lanes.filter(l => !l.mine);
     saveLanes();
     renderLanes(); renderBusMarkers(); renderNear(); renderHive();
     showToast('Your lanes cleared', 'success');
   };
+
   $('#setResetAll').onclick = async () => {
-    const ok = await confirmDialog('Reset all data?', 'This deletes vehicle, lanes, Hive posts, settings.', true);
+    const ok = await confirmDialog('Reset all data?', 'This deletes vehicle, lanes, Hive posts, settings. You\'ll see onboarding again.', true);
     if (!ok) return;
     Object.keys(localStorage).filter(k => k.startsWith('steeradar-')).forEach(k => localStorage.removeItem(k));
     location.reload();
@@ -1168,6 +1203,10 @@ function openSettings() {
   $('#setCloudSync').checked = cloud.enabled;
   $('#setCloudUrl').value = cloud.url;
   $('#setCloudKey').value = cloud.key;
+
+  if (cloud.enabled && cloud.url) updateCloudStatus('✓ Connected', 'ok');
+  else if (cloud.url) updateCloudStatus('Paused', '');
+  else updateCloudStatus('Not configured', 'err');
 
   openModal('#settingsModal');
 }
@@ -1200,6 +1239,7 @@ function saveSettings() {
   closeModal('#settingsModal');
   showToast('Settings saved', 'success');
 
+  startCloudPolling();
   if (!wasEnabled && cloud.enabled) syncFromCloud();
 }
 
@@ -1215,7 +1255,6 @@ function initFabAndHeader() {
       const sent = broadcastToAllPeers({ type: 'chat', text: state.userName + ' is now visible nearby 👋', sender: state.userName });
       showToast(sent ? `Broadcast to ${sent} neighbour${sent === 1 ? '' : 's'}` : 'You are visible nearby ✓', 'success');
     } else {
-      // Hive new post — ask title + text
       const title = await promptDialog('New post — title', '', 'A short headline (optional)');
       if (title === false) return;
       const text = await promptDialog('Post body', '', 'What do you want to share?');
@@ -1258,7 +1297,6 @@ function initFabAndHeader() {
 
   $('#btScanBtn').onclick = scanBluetooth;
 
-  // Dialog buttons
   $('#dialogOk').onclick = () => {
     const inputEl = $('#dialogInput');
     const hasInput = inputEl.style.display !== 'none';
@@ -1289,11 +1327,9 @@ function initApp() {
   updateFab();
   initPeer();
 
-  // Cloud sync — initial + polling every 15s
   if (cloud.enabled) {
     syncFromCloud();
-    clearInterval(state.cloudSyncTimer);
-    state.cloudSyncTimer = setInterval(() => syncFromCloud(true), 15000);
+    startCloudPolling();
   }
 }
 
@@ -1309,7 +1345,13 @@ function boot() {
 
   if (state.vehicle) initApp();
 
-  console.log('%c STEERADAR v3 ', 'background:#0D9488;color:#fff;font-weight:800;padding:4px 10px;border-radius:4px;font-family:sans-serif', 'Universal DB · Deepstash UI · RAGina removed');
+  console.log(
+    `%c ${APP_NAME} `,
+    'background:#0D9488;color:#fff;font-weight:800;padding:4px 10px;border-radius:4px;font-family:sans-serif',
+    CFG.APP_VERSION || 'v3.0',
+    '· Universal DB',
+    cloud.enabled ? '(enabled)' : '(disabled)'
+  );
 }
 
 if (document.readyState === 'complete' || document.readyState === 'interactive') setTimeout(boot, 0);
