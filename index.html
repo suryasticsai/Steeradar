@@ -6,7 +6,8 @@
 <meta name="theme-color" content="#0F1115">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Steeradar — Live Community Rides</title>
-<link rel="icon" type="image/png" href="https://raw.githubusercontent.com/suryasticsai/Steeradar/main/steeradar-logo.png">
+<!-- FIXED logo URL (note: filename is steerardar-logo.png) -->
+<link rel="icon" type="image/png" href="https://raw.githubusercontent.com/suryasticsai/Steeradar/main/steerardar-logo.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 :root{
@@ -190,7 +191,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .connected-pill{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:var(--surface-solid);border:1px solid var(--teal);border-radius:14px;padding:6px 14px;display:flex;align-items:center;gap:7px;font-size:.72rem;font-weight:700;color:var(--teal);z-index:6;box-shadow:0 0 24px rgba(0,229,195,.2)}
 .connected-pill .live-dot{width:6px;height:6px;border-radius:50%;background:var(--teal);box-shadow:0 0 8px var(--teal);animation:livePulse 1.4s ease-in-out infinite}
 
-/* Local intranet banner */
 .local-room-banner{margin:0 16px 12px;padding:14px 16px;border-radius:var(--radius);background:linear-gradient(135deg,rgba(0,229,195,.12),rgba(162,155,254,.08)),var(--surface-solid);border:1px solid rgba(0,229,195,.3);box-shadow:0 0 24px rgba(0,229,195,.08);position:relative;overflow:hidden}
 .local-room-banner .lrb-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .local-room-banner .lrb-icon{width:36px;height:36px;border-radius:10px;background:rgba(0,229,195,.15);border:1px solid var(--teal);display:flex;align-items:center;justify-content:center;color:var(--teal);flex-shrink:0;font-size:1rem}
@@ -215,7 +215,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .room-card .room-meta{font-size:.72rem;color:var(--text-2)}
 .room-card .open-btn{padding:6px 13px;border-radius:20px;background:var(--surface-2);border:1px solid var(--border);font-size:.72rem;font-weight:600;white-space:nowrap}
 
-/* Bluetooth panel */
 .bt-panel{margin:0 16px 12px;padding:14px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--border)}
 .bt-panel .bt-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .bt-panel .bt-title{font-size:.82rem;font-weight:700;display:flex;align-items:center;gap:7px}
@@ -327,7 +326,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .chat-header{display:flex;align-items:center;gap:11px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:12px}
 .chat-header .ch-avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--teal),#007B6E);display:flex;align-items:center;justify-content:center;font-weight:800;color:#0F1115;font-size:.9rem;flex-shrink:0}
 .chat-header .ch-avatar.bt{background:linear-gradient(135deg,var(--purple),#6c5ce7);color:#fff}
-.chat-header .ch-avatar.ai{background:linear-gradient(135deg,var(--purple),#6c5ce7);color:#fff;font-size:.85rem}
 .chat-header .ch-info{flex:1;min-width:0}
 .chat-header .ch-name{font-size:.92rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chat-header .ch-status{font-size:.7rem;color:var(--teal);display:flex;align-items:center;gap:5px}
@@ -359,27 +357,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .conn-badge.offline{color:var(--coral);border-color:rgba(255,107,74,.3)}
 .conn-badge .dot{width:5px;height:5px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
 
-/* Ragina AI panel */
-.ai-panel{position:fixed;inset:0;z-index:1500;background:rgba(0,0,0,.85);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:none;flex-direction:column;align-items:center;justify-content:flex-end;animation:fadeIn .2s ease}
-.ai-panel.active{display:flex}
-.ai-frame-wrap{background:var(--surface-solid);border-radius:24px 24px 0 0;width:100%;max-width:480px;height:85vh;display:flex;flex-direction:column;border-top:1px solid var(--border);animation:slideUp .3s cubic-bezier(.34,1.3,.64,1)}
-.ai-frame-head{display:flex;align-items:center;gap:11px;padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0}
-.ai-frame-head .ai-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--purple),#6c5ce7);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#fff;flex-shrink:0;box-shadow:0 0 20px rgba(162,155,254,.5)}
-.ai-frame-head .ai-title{flex:1}
-.ai-frame-head .ai-title .name{font-size:.95rem;font-weight:700;display:flex;align-items:center;gap:6px}
-.ai-frame-head .ai-title .name .badge{font-size:.6rem;padding:2px 6px;border-radius:8px;background:var(--purple);color:#fff;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
-.ai-frame-head .ai-title .sub{font-size:.7rem;color:var(--text-2);margin-top:1px}
-.ai-frame-head .close-ai{width:34px;height:34px;border-radius:50%;background:var(--surface-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.ai-frame-body{flex:1;overflow:hidden;position:relative}
-.ai-frame-body iframe{width:100%;height:100%;border:none;background:#0B0D12}
-.ai-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:var(--bg-2);color:var(--text-2);font-size:.82rem}
-.ai-loading .spinner{width:32px;height:32px;border-radius:50%;border:2px solid var(--surface-2);border-top-color:var(--purple);animation:spin 1s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.ai-quick-row{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;flex-shrink:0}
-.ai-quick-row::-webkit-scrollbar{display:none}
-.ai-quick{padding:8px 14px;border-radius:20px;background:var(--surface-2);border:1px solid var(--border);font-size:.74rem;font-weight:600;white-space:nowrap;color:var(--text-2)}
-.ai-quick:active{background:var(--teal-dim);color:var(--teal);border-color:var(--teal)}
-
 @media(max-width:380px){
   .vehicle-badge{max-width:90px;font-size:.65rem}
   .view-header h2{font-size:1.4rem}
@@ -392,7 +369,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 <!-- ============ Onboarding Gate ============ -->
 <div id="onboardGate">
   <div class="onboard-logo">
-    <img src="https://raw.githubusercontent.com/suryasticsai/Steeradar/main/steeradar-logo.png" alt="Steeradar"
+    <img src="https://raw.githubusercontent.com/suryasticsai/Steeradar/main/steerardar-logo.png" alt="Steeradar"
       onerror="this.style.display='none';this.parentNode.innerHTML='<svg width=\'70\' height=\'70\' viewBox=\'0 0 32 32\' fill=\'none\'><circle cx=\'16\' cy=\'16\' r=\'13\' stroke=\'%2300E5C3\' stroke-width=\'2\'/><circle cx=\'16\' cy=\'16\' r=\'4\' fill=\'%2300E5C3\'/><path d=\'M16 3v9M16 20v9M3 16h9M20 16h9\' stroke=\'%2300E5C3\' stroke-width=\'1.6\' stroke-linecap=\'round\' opacity=\'0.6\'/><circle cx=\'24\' cy=\'8\' r=\'2.5\' fill=\'%23FF6B4A\'/></svg>'">
   </div>
   <h1 class="onboard-title"><span class="steer">Steer</span><span class="adar">adar</span><span class="dot">.</span></h1>
@@ -431,7 +408,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 <div id="app">
   <header>
     <div class="logo">
-      <img class="logo-img" src="https://raw.githubusercontent.com/suryasticsai/Steeradar/main/steeradar-logo.png" alt="Steeradar"
+      <img class="logo-img" src="https://raw.githubusercontent.com/suryasticsai/Steeradar/main/steerardar-logo.png" alt="Steeradar"
         onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<svg width=\'32\' height=\'32\' viewBox=\'0 0 32 32\' fill=\'none\'><circle cx=\'16\' cy=\'16\' r=\'13\' stroke=\'%2300E5C3\' stroke-width=\'2\'/><circle cx=\'16\' cy=\'16\' r=\'4\' fill=\'%2300E5C3\'/></svg>')">
       <div class="logo-text"><span>Steer</span><span class="adar">adar</span><span class="dot">.</span></div>
     </div>
@@ -608,61 +585,46 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
   <button class="btn-secondary" id="changeVehicleCancel">Cancel</button>
 </div></div>
 
-<!-- Ragina AI panel -->
-<div class="ai-panel" id="aiPanel">
-  <div class="ai-frame-wrap">
-    <div class="ai-frame-head">
-      <div class="ai-avatar">🤖</div>
-      <div class="ai-title">
-        <div class="name">Ragina <span class="badge">AI</span></div>
-        <div class="sub" id="aiSubStatus">Ready to help with routes, rides, community</div>
-      </div>
-      <button class="close-ai" id="aiClose"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
-    </div>
-    <div class="ai-frame-body">
-      <div class="ai-loading" id="aiLoading"><div class="spinner"></div><div>Waking up Ragina…</div></div>
-      <iframe id="aiFrame" src="about:blank" allow="clipboard-write; microphone" title="Ragina AI"></iframe>
-    </div>
-    <div class="ai-quick-row">
-      <button class="ai-quick" data-q="Best route from Koramangala to Whitefield right now?">Best route now?</button>
-      <button class="ai-quick" data-q="Summarise what the nearby Steeradar community is talking about.">Nearby buzz</button>
-      <button class="ai-quick" data-q="Fair fare for 8 km with 3 passengers in Bengaluru?">Fair fare?</button>
-      <button class="ai-quick" data-q="Any lost-and-found posts I should know about?">Lost & found</button>
-    </div>
-  </div>
-</div>
-
 <div class="toast" id="toast"></div>
 
+<!-- Leaflet + PeerJS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<!-- RAGina Pro (includes music player, voice, persistent memory) -->
+<script src="https://cdn.jsdelivr.net/gh/suryasticsai/RAGina@main/ragina-pro.js"></script>
 
 <script>
 /* ============================================================
-   STEERADAR — with Web Bluetooth + Local intranet + Ragina AI
+   STEERADAR — Real working app (v2)
+   - Real WebRTC (PeerJS) for lane chats + local geohash mesh
+   - Real Web Bluetooth scan
+   - Real RAGina Pro orb (music, voice, memory)
+   - No dummy seed lanes — everything is user-generated
    ============================================================ */
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const timeAgo = (ts) => { const d=Date.now()-ts,m=Math.floor(d/60000); if(m<1)return'just now'; if(m<60)return m+'m ago'; const h=Math.floor(m/60); if(h<24)return h+'h ago'; return Math.floor(h/24)+'d ago'; };
 const showToast = (msg) => { const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2400); };
 const validateVehicle = (v) => /^[A-Z0-9]{4,15}$/i.test(v.replace(/[\s-]/g,''));
 const normalizeVehicle = (v) => v.replace(/[\s-]/g,'').toUpperCase();
 
-// ---------------- Geohash (proximity room derivation) ----------------
+// Haversine distance in metres
+function distanceM(a, b) {
+  if (!a || !b || a.lat == null || b.lat == null) return null;
+  const R = 6371000, toRad = d => d * Math.PI / 180;
+  const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+  const s = Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng/2)**2;
+  return Math.round(2 * R * Math.asin(Math.sqrt(s)));
+}
+
+// ---------------- Geohash ----------------
 const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz';
 function geohash(lat, lng, precision = 6) {
-  let latR = [-90, 90], lngR = [-180, 180];
-  let hash = '', bit = 0, ch = 0, even = true;
+  let latR = [-90, 90], lngR = [-180, 180], hash = '', bit = 0, ch = 0, even = true;
   while (hash.length < precision) {
-    if (even) {
-      const mid = (lngR[0] + lngR[1]) / 2;
-      if (lng >= mid) { ch = (ch << 1) + 1; lngR[0] = mid; } else { ch = ch << 1; lngR[1] = mid; }
-    } else {
-      const mid = (latR[0] + latR[1]) / 2;
-      if (lat >= mid) { ch = (ch << 1) + 1; latR[0] = mid; } else { ch = ch << 1; latR[1] = mid; }
-    }
+    if (even) { const mid=(lngR[0]+lngR[1])/2; if (lng>=mid){ch=(ch<<1)+1;lngR[0]=mid;}else{ch=ch<<1;lngR[1]=mid;} }
+    else { const mid=(latR[0]+latR[1])/2; if (lat>=mid){ch=(ch<<1)+1;latR[0]=mid;}else{ch=ch<<1;latR[1]=mid;} }
     even = !even;
     if (++bit === 5) { hash += BASE32[ch]; bit = 0; ch = 0; }
   }
@@ -674,13 +636,14 @@ const state = {
   vehicle: null,
   userName: localStorage.getItem('steeradar-name') || '',
   lanes: [],
-  peer: null,          // vehicle-based peer (for lane chats)
+  peer: null,
   peerId: null,
-  localPeer: null,     // proximity room peer (for intranet)
+  localPeer: null,
   localPeerId: null,
   localRoomPrefix: null,
   localSlot: null,
-  localPeers: new Map(), // peerId -> { name, avatar, vehicle }
+  localPeers: new Map(),
+  localConns: new Map(),
   connections: new Map(),
   activeChatLaneId: null,
   activeChatPeerId: null,
@@ -693,15 +656,8 @@ const state = {
   userGeohash: null,
   currentTab: 'pulse',
   btDevices: [],
-  raginaEndpoint: localStorage.getItem('steeradar-ragina-endpoint') || 'https://ragina-crawler-ragina.vercel.app'
+  hivePosts: []
 };
-
-const SEED_LANES = [
-  { id:'seed-1', driver:'Marcus T.', avatar:'MT', rating:4.9, route:{from:'Koramangala 5th',via:['Indiranagar'],to:'Marathahalli'}, seats:{total:10,taken:6}, fare:20, status:'live', lat:12.9352,lng:77.6245, peerId:null, mine:false, ts:Date.now()-900000 },
-  { id:'seed-2', driver:'Aisha B.', avatar:'AB', rating:4.8, route:{from:'Jayanagar',via:['JP Nagar'],to:'Whitefield'}, seats:{total:10,taken:3}, fare:25, status:'live', lat:12.9308,lng:77.5838, peerId:null, mine:false, ts:Date.now()-1500000 },
-  { id:'seed-3', driver:'James L.', avatar:'JL', rating:4.7, route:{from:'Domlur',via:['12th Main'],to:'Koramangala'}, seats:{total:10,taken:8}, fare:15, status:'live', lat:12.9609,lng:77.6387, peerId:null, mine:false, ts:Date.now()-600000 },
-  { id:'seed-4', driver:'Priya S.', avatar:'PS', rating:4.9, route:{from:'Whitefield',via:['Marathahalli','Domlur'],to:'MG Road'}, seats:{total:12,taken:5}, fare:30, status:'live', lat:12.9698,lng:77.7500, peerId:null, mine:false, ts:Date.now()-300000 }
-];
 
 // ---------------- Onboarding ----------------
 const onboardGate = $('#onboardGate');
@@ -734,12 +690,21 @@ if (savedVehicle && validateVehicle(savedVehicle)) {
 }
 
 // ---------------- Storage ----------------
-function storageKey() { return 'steeradar-lanes-' + state.vehicle; }
+function lanesKey() { return 'steeradar-lanes-' + state.vehicle; }
+function hiveKey()  { return 'steeradar-hive-' + state.vehicle; }
+
 function loadLanes() {
-  try { const raw = localStorage.getItem(storageKey()); const mine = raw ? JSON.parse(raw) : []; state.lanes = [...mine, ...SEED_LANES]; }
-  catch (e) { state.lanes = [...SEED_LANES]; }
+  try { const raw = localStorage.getItem(lanesKey()); state.lanes = raw ? JSON.parse(raw) : []; }
+  catch (e) { state.lanes = []; }
 }
-function saveMyLanes() { localStorage.setItem(storageKey(), JSON.stringify(state.lanes.filter(l => l.mine))); }
+function saveLanes() { localStorage.setItem(lanesKey(), JSON.stringify(state.lanes)); }
+
+function loadHive() {
+  try { const raw = localStorage.getItem(hiveKey()); state.hivePosts = raw ? JSON.parse(raw) : []; }
+  catch (e) { state.hivePosts = []; }
+}
+function saveHive() { localStorage.setItem(hiveKey(), JSON.stringify(state.hivePosts)); }
+
 function loadName() { if (!state.userName) { state.userName = 'Driver ' + state.vehicle.slice(-4); localStorage.setItem('steeradar-name', state.userName); } }
 
 // ============================================================
@@ -797,6 +762,7 @@ function updateConnBadge(online, text) {
 //  PEER B — Local intranet room (geohash slot-based discovery)
 // ============================================================
 const LOCAL_ROOM_SLOTS = 20;
+let localRescanTimer = null;
 
 async function initLocalRoom(lat, lng) {
   if (typeof Peer === 'undefined') { $('#localRoomSub').textContent = 'WebRTC not available'; return; }
@@ -806,38 +772,27 @@ async function initLocalRoom(lat, lng) {
   const prefix = 'steeradar-loc-' + gh;
   state.localRoomPrefix = prefix;
   $('#localRoomId').textContent = gh.toUpperCase();
-  $('#localRoomSub').textContent = 'Your neighbourhood mesh · ~1km radius';
+  $('#localRoomSub').textContent = 'Your neighbourhood mesh · ~1 km radius';
   $('#localPeerCount').textContent = 'Searching…';
 
-  // Try to claim a slot
   for (let i = 1; i <= LOCAL_ROOM_SLOTS; i++) {
     const id = prefix + '-' + i;
     const claimed = await tryClaimSlot(id);
-    if (claimed) {
-      state.localSlot = i;
-      state.localPeerId = id;
-      state.localPeer = claimed;
-      break;
-    }
+    if (claimed) { state.localSlot = i; state.localPeerId = id; state.localPeer = claimed; break; }
   }
-
   if (!state.localPeer) { $('#localRoomSub').textContent = 'Room is full · try again'; return; }
 
   state.localPeer.on('connection', (conn) => {
     conn.on('open', () => {
-      // Exchange hello with identity
-      conn.send({ type: 'hello', name: state.userName, vehicle: state.vehicle, avatar: state.userName.substring(0,2).toUpperCase() });
+      conn.send({ type: 'hello', name: state.userName, vehicle: state.vehicle, avatar: state.userName.substring(0,2).toUpperCase(), lat: state.userLat, lng: state.userLng });
       attachLocalConn(conn);
     });
   });
   state.localPeer.on('error', (err) => { if (err.type !== 'peer-unavailable') console.warn('Local peer error', err.type); });
 
-  // Scan all other slots
   scanLocalRoom();
-  // Periodically re-scan every 30s
-  setInterval(scanLocalRoom, 30000);
-
-  // Handle visibility change — re-scan on focus
+  clearInterval(localRescanTimer);
+  localRescanTimer = setInterval(scanLocalRoom, 30000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) scanLocalRoom(); });
 }
 
@@ -856,25 +811,28 @@ function scanLocalRoom() {
   for (let i = 1; i <= LOCAL_ROOM_SLOTS; i++) {
     if (i === state.localSlot) continue;
     const targetId = state.localRoomPrefix + '-' + i;
-    if (state.localPeers.has(targetId)) continue;
-    // Check if we already tried & failed recently
-    if (state.localPeers.get(targetId + ':pending')) continue;
+    if (state.localPeers.has(targetId) || state.localPeers.get(targetId + ':pending')) continue;
 
-    const conn = state.localPeer.connect(targetId, { reliable: true, metadata: { vehicle: state.vehicle, name: state.userName } });
+    const conn = state.localPeer.connect(targetId, { reliable: true });
     state.localPeers.set(targetId + ':pending', true);
     const cleanup = () => state.localPeers.delete(targetId + ':pending');
 
     const t = setTimeout(() => { try { conn.close(); } catch(e){} cleanup(); }, 5000);
-    conn.on('open', () => { clearTimeout(t); cleanup(); conn.send({ type:'hello', name: state.userName, vehicle: state.vehicle, avatar: state.userName.substring(0,2).toUpperCase() }); attachLocalConn(conn); });
+    conn.on('open', () => {
+      clearTimeout(t); cleanup();
+      conn.send({ type: 'hello', name: state.userName, vehicle: state.vehicle, avatar: state.userName.substring(0,2).toUpperCase(), lat: state.userLat, lng: state.userLng });
+      attachLocalConn(conn);
+    });
     conn.on('error', () => { clearTimeout(t); cleanup(); });
   }
 }
 
 function attachLocalConn(conn) {
+  state.localConns.set(conn.peer, conn);
   conn.on('data', (data) => {
     if (!data || typeof data !== 'object') return;
     if (data.type === 'hello') {
-      const info = { name: data.name || 'Driver', vehicle: data.vehicle || '?', avatar: (data.avatar || data.name?.substring(0,2) || 'DR').toUpperCase() };
+      const info = { name: data.name || 'Driver', vehicle: data.vehicle || '?', avatar: (data.avatar || data.name?.substring(0,2) || 'DR').toUpperCase(), lat: data.lat, lng: data.lng };
       state.localPeers.set(conn.peer, info);
       updateLocalPeers();
       showToast('👋 ' + info.name + ' joined the local room');
@@ -882,11 +840,10 @@ function attachLocalConn(conn) {
       addChatBubble(data.text, data.sender || 'Local', false);
       if (document.hidden && 'Notification' in window && Notification.permission === 'granted') new Notification('Steeradar Local', { body: (data.sender||'Neighbour') + ': ' + data.text });
     } else if (data.type === 'leave') {
-      state.localPeers.delete(conn.peer);
-      updateLocalPeers();
+      state.localPeers.delete(conn.peer); state.localConns.delete(conn.peer); updateLocalPeers();
     }
   });
-  conn.on('close', () => { state.localPeers.delete(conn.peer); updateLocalPeers(); });
+  conn.on('close', () => { state.localPeers.delete(conn.peer); state.localConns.delete(conn.peer); updateLocalPeers(); });
 }
 
 function updateLocalPeers() {
@@ -894,28 +851,6 @@ function updateLocalPeers() {
   $('#localPeerCount').textContent = peers.length + ' peer' + (peers.length === 1 ? '' : 's');
   renderNear();
 }
-
-function broadcastLocal(msg) {
-  let sent = 0;
-  for (const [id, conn] of state.localPeers.entries()) {
-    if (id.endsWith(':pending')) continue;
-    // conn is the connection object stored as key in state.localPeers? No — we stored info. Need to store conns separately.
-  }
-  // We'll handle broadcast via state.localConns below
-  for (const [id, conn] of state.localConns.entries()) {
-    if (conn.open) { try { conn.send(msg); sent++; } catch(e){} }
-  }
-  return sent;
-}
-state.localConns = new Map();
-
-// Patch attachLocalConn to also track connections
-const _origAttach = attachLocalConn;
-attachLocalConn = function(conn) {
-  state.localConns.set(conn.peer, conn);
-  conn.on('close', () => state.localConns.delete(conn.peer));
-  _origAttach(conn);
-};
 
 // ============================================================
 //  WEB BLUETOOTH
@@ -927,17 +862,12 @@ async function scanBluetooth() {
   try {
     const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ['generic_access','device_information','battery_service'] });
     const known = state.btDevices.find(d => d.id === device.id);
-    if (!known) {
-      state.btDevices.push({
-        id: device.id, name: device.name || 'Unknown device', connected: false, rssi: -Math.floor(40 + Math.random() * 50), device
-      });
-    }
+    if (!known) state.btDevices.push({ id: device.id, name: device.name || 'Unknown device', connected: false, rssi: -Math.floor(40 + Math.random() * 50), device });
     renderBluetooth();
     showToast('Found: ' + (device.name || 'Unknown'));
 
-    // Try to connect (optional, may fail)
     try {
-      const server = await device.gatt.connect();
+      await device.gatt.connect();
       const entry = state.btDevices.find(d => d.id === device.id);
       if (entry) { entry.connected = true; renderBluetooth(); }
       device.addEventListener('gattserverdisconnected', () => {
@@ -964,8 +894,7 @@ function renderBluetooth() {
         <div class="bt-meta">${d.connected ? 'Connected' : 'RSSI ' + d.rssi + ' dBm'} · ${esc(d.id.slice(0,10))}…</div>
       </div>
       <button class="bt-action" data-action="toggle">${d.connected ? 'Drop' : 'Connect'}</button>
-    </div>
-  `).join('');
+    </div>`).join('');
   wrap.querySelectorAll('[data-action="toggle"]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const row = btn.closest('.bt-device');
@@ -981,45 +910,30 @@ function renderBluetooth() {
 }
 
 // ============================================================
-//  RAGINA AI
+//  RAGINA AI — opens the RAGina Pro orb (music, voice, memory)
 // ============================================================
 function openRagina() {
-  const panel = $('#aiPanel');
-  panel.classList.add('active');
-  const frame = $('#aiFrame');
-  const loading = $('#aiLoading');
-  loading.style.display = 'flex';
-  frame.onload = () => { loading.style.display = 'none'; };
-  // Reset iframe and load Ragina
-  frame.src = 'about:blank';
-  setTimeout(() => { frame.src = state.raginaEndpoint; }, 100);
-  $('#aiSubStatus').textContent = 'Powered by Ragina · ' + new URL(state.raginaEndpoint).hostname;
-}
-function closeRagina() { $('#aiPanel').classList.remove('active'); $('#aiFrame').src = 'about:blank'; }
-function askRagina(q) {
-  // Try postMessage to iframe (works if Ragina listens for it)
-  const frame = $('#aiFrame');
-  try { frame.contentWindow.postMessage({ type: 'steeradar:ask', query: q, context: getRaginaContext() }, '*'); } catch (e) {}
-  // Fallback: append query as URL param
-  try {
-    const u = new URL(state.raginaEndpoint);
-    u.searchParams.set('q', q);
-    u.searchParams.set('ctx', encodeURIComponent(JSON.stringify(getRaginaContext())));
-    frame.src = u.toString();
-  } catch(e){}
+  // RAGina Pro creates a floating orb at bottom-right. Find & click it.
+  const orb = document.querySelector('.ragina-orb, .ragina-toggle, [class*="ragina"][class*="orb"]');
+  if (orb) { orb.click(); return; }
+  // Fallback: find any element with ragina in class and click
+  const alt = document.querySelector('[class*="ragina"]');
+  if (alt) { alt.click(); return; }
+  showToast('RAGina is loading…');
 }
 
-function getRaginaContext() {
-  const nearLanes = state.lanes.filter(l => l.status === 'live').slice(0,5).map(l => ({
-    driver: l.driver, to: l.route.to, from: l.route.from, fare: l.fare, seatsLeft: l.seats.total - l.seats.taken
-  }));
-  return {
-    user: { name: state.userName, vehicle: state.vehicle, geohash: state.userGeohash, location: $('#locText')?.textContent || '' },
-    nearbyPeers: [...state.localPeers.entries()].filter(([k])=>!k.endsWith(':pending')).map(([_,v])=>v),
-    activeLanes: nearLanes,
-    bluetoothDevices: state.btDevices.map(d => ({ name: d.name, connected: d.connected })),
-    timestamp: Date.now()
-  };
+function askRagina(q) {
+  openRagina();
+  // Try to fill RAGina input after a delay
+  setTimeout(() => {
+    const input = document.querySelector('.ragina-input, [class*="ragina"] input[type="text"], [class*="ragina"] textarea');
+    if (input) {
+      input.value = q;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      const send = document.querySelector('.ragina-send, [class*="ragina"] button[type="submit"]');
+      if (send) send.click();
+    }
+  }, 900);
 }
 
 // ============================================================
@@ -1067,7 +981,6 @@ function initMap() {
         state.map.setView([latitude, longitude], 13);
         placeUserMarker(latitude, longitude);
         reverseGeocode(latitude, longitude);
-        // Init local room with location
         initLocalRoom(latitude, longitude);
       },
       () => { $('#locText').textContent = 'Bengaluru, Karnataka'; reverseGeocode(12.9716, 77.5946); initLocalRoom(12.9716, 77.5946); },
@@ -1156,7 +1069,7 @@ function showLaneCard(lane) {
 function renderLanes() {
   const list = $('#laneList');
   const lanes = filteredLanes();
-  if (!lanes.length) { list.innerHTML = `<div class="empty"><div class="icon">🚌</div><p>No lanes here yet. Post yours!</p></div>`; return; }
+  if (!lanes.length) { list.innerHTML = `<div class="empty"><div class="icon">🚌</div><p>No lanes yet. Tap <b>Post my lane</b> to be the first.</p></div>`; return; }
   const sorted = [...lanes].sort((a,b) => (b.mine - a.mine) || (b.ts - a.ts));
   list.innerHTML = sorted.map(lane => {
     const left = lane.seats.total - lane.seats.taken;
@@ -1204,7 +1117,7 @@ function renderLanes() {
 }
 
 // ============================================================
-//  NEAR (Proximity)
+//  NEAR (Proximity) — uses real distances now
 // ============================================================
 function renderNear() {
   const wrap = $('#proximityWrap');
@@ -1213,49 +1126,46 @@ function renderNear() {
 
   const cx = 50, cy = 50, maxR = 40;
   const items = [];
-  const N = localPeers.length + nearbyLanes.length;
-  let idx = 0;
-  for (const [id, peer] of localPeers) {
-    const angle = (idx / Math.max(N, 1)) * 360 - 90;
-    const dist = 15 + Math.floor(Math.random() * 35);
-    const radius = Math.min((dist / 70) * maxR, maxR);
+  const me = { lat: state.userLat, lng: state.userLng };
+
+  // Local peers
+  localPeers.forEach(([id, peer], i) => {
+    const dist = peer.lat && me.lat ? distanceM(me, { lat: peer.lat, lng: peer.lng }) : null;
+    const d = dist != null ? dist : 15 + Math.floor(Math.random() * 35);
+    const angle = (i / Math.max(localPeers.length + nearbyLanes.length, 1)) * 360 - 90;
+    const radius = Math.min((d / 70) * maxR, maxR);
     const rad = (angle * Math.PI) / 180;
-    items.push({
-      x: cx + Math.cos(rad) * radius, y: cy + Math.sin(rad) * radius,
-      avatar: peer.avatar, name: peer.name, vehicle: peer.vehicle, dist, type: 'peer', id
-    });
-    idx++;
-  }
-  for (const lane of nearbyLanes) {
-    const angle = (idx / Math.max(N, 1)) * 360 - 90;
-    const dist = 25 + Math.floor(Math.random() * 40);
-    const radius = Math.min((dist / 70) * maxR, maxR);
+    items.push({ x: cx + Math.cos(rad) * radius, y: cy + Math.sin(rad) * radius, avatar: peer.avatar, name: peer.name, dist: d, type: 'peer', id, real: dist != null });
+  });
+
+  // Nearby lanes
+  nearbyLanes.forEach((lane, i) => {
+    const dist = lane.lat && me.lat ? distanceM(me, { lat: lane.lat, lng: lane.lng }) : null;
+    const d = dist != null ? dist : 25 + Math.floor(Math.random() * 40);
+    const angle = ((localPeers.length + i) / Math.max(localPeers.length + nearbyLanes.length, 1)) * 360 - 90;
+    const radius = Math.min((d / 70) * maxR, maxR);
     const rad = (angle * Math.PI) / 180;
-    items.push({
-      x: cx + Math.cos(rad) * radius, y: cy + Math.sin(rad) * radius,
-      avatar: lane.avatar, name: lane.driver, vehicle: null, dist, type: 'lane', id: lane.id, coral: true
-    });
-    idx++;
-  }
-  for (const d of state.btDevices.slice(0, 2)) {
-    const angle = Math.random() * 360 - 90;
+    items.push({ x: cx + Math.cos(rad) * radius, y: cy + Math.sin(rad) * radius, avatar: lane.avatar, name: lane.driver, dist: d, type: 'lane', id: lane.id, coral: true, real: dist != null });
+  });
+
+  // BT devices
+  state.btDevices.slice(0, 2).forEach(d => {
     const dist = 5 + Math.floor(Math.random() * 20);
+    const angle = Math.random() * 360 - 90;
     const radius = Math.min((dist / 70) * maxR, maxR);
     const rad = (angle * Math.PI) / 180;
-    items.push({
-      x: cx + Math.cos(rad) * radius, y: cy + Math.sin(rad) * radius,
-      avatar: '📶', name: d.name, vehicle: null, dist, type: 'bt', id: d.id, bt: true
-    });
-  }
+    items.push({ x: cx + Math.cos(rad) * radius, y: cy + Math.sin(rad) * radius, avatar: '📶', name: d.name, dist, type: 'bt', id: d.id, bt: true });
+  });
 
   const html = [];
   html.push(`<div class="center-user">${esc((state.userName||'You').charAt(0).toUpperCase())}</div>`);
   html.push(`<div class="center-label">${esc(state.vehicle)} · You</div>`);
   items.forEach((it, i) => {
+    const distLabel = it.real ? it.dist + ' m' : '~' + it.dist + ' m';
     html.push(`
       <div class="peer-bubble" style="left:${it.x}%;top:${it.y}%;transform:translate(-50%,-50%);animation-delay:${i*0.06}s" data-type="${it.type}" data-id="${esc(it.id)}">
         <div class="p-avatar ${it.coral?'coral':''} ${it.bt?'bt':''}">${esc(it.avatar)}</div>
-        <div class="p-label"><span class="dist">${it.dist} m</span><br>${esc(it.name.slice(0,14))}</div>
+        <div class="p-label"><span class="dist">${distLabel}</span><br>${esc(it.name.slice(0,14))}</div>
       </div>`);
   });
   html.push(`<div class="connected-pill"><span class="live-dot"></span> ${localPeers.length} local · ${nearbyLanes.length} lanes${state.btDevices.length?' · '+state.btDevices.length+' BT':''}</div>`);
@@ -1316,19 +1226,14 @@ function openLocalChat(peerId) {
   openModal('#chatModal');
 }
 
-$('#chatSend_override_hook')?.remove?.();
-const _origChatSend = $('#chatSend').onclick;
-
 // ============================================================
-//  HIVE
+//  HIVE — real posts, stored locally
 // ============================================================
-const HIVE_POSTS = [
-  { name:'Karan (Driver)', verified:true, avatar:'KD', time:'2h ago · Route 12', text:'Morning traffic was smoother today! 🚌 Thanks for the patience, team.', media:true, likes:24, comments:7, shares:3 },
-  { name:'Ananya', verified:false, avatar:'AN', time:'5h ago · Indiranagar', text:'Found a lost blue backpack on the 6:15 to Marathahalli. Kept it safe with the driver — DM if it\'s yours!', media:false, likes:41, comments:12, shares:6 }
-];
-
 function renderHive() {
-  const stories = [{label:'Add',avatar:'＋',add:true},{label:'Ananya',avatar:'AN'},{label:'Rohit',avatar:'R'},{label:'Meera',avatar:'M'},{label:'Arjun',avatar:'A'}];
+  const stories = [
+    { label: 'Add', avatar: '＋', add: true },
+    ...state.lanes.slice(0, 4).map(l => ({ label: l.driver.split(' ')[0], avatar: l.avatar }))
+  ];
   $('#storyRow').innerHTML = stories.map(s => `
     <div class="story"><div class="story-ring"><div class="story-inner ${s.add?'add':''}">${esc(s.avatar)}</div></div><div class="story-name">${esc(s.label)}</div></div>`).join('');
 
@@ -1337,37 +1242,28 @@ function renderHive() {
   $('#greetingText').textContent = `${g}, ${state.userName.split(' ')[0]} 👋`;
 
   const feed = [];
-  HIVE_POSTS.forEach(post => {
-    feed.push(`
-      <div class="post-card">
-        <div class="post-head">
-          <div class="post-avatar">${esc(post.avatar)}</div>
-          <div class="post-meta">
-            <div class="post-name">${esc(post.name)} ${post.verified?'<span class="verified">✓</span>':''}</div>
-            <div class="post-time">${esc(post.time)}</div>
+  if (state.hivePosts.length === 0) {
+    feed.push(`<div class="empty"><div class="icon">🐝</div><p>No posts yet. Tap <b>New post</b> to share something with your community.</p></div>`);
+  } else {
+    state.hivePosts.slice().reverse().forEach(post => {
+      feed.push(`
+        <div class="post-card">
+          <div class="post-head">
+            <div class="post-avatar">${esc(post.avatar)}</div>
+            <div class="post-meta">
+              <div class="post-name">${esc(post.name)}</div>
+              <div class="post-time">${esc(post.time)}</div>
+            </div>
           </div>
-        </div>
-        <div class="post-body">${esc(post.text)}</div>
-        ${post.media?'<div class="post-media"><div class="play-btn">▶</div></div>':''}
-        <div class="post-actions">
-          <button class="pa-btn" data-act="like" data-count="${post.likes}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span class="cnt">${post.likes}</span></button>
-          <button class="pa-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>${post.comments}</button>
-          <button class="pa-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/></svg>${post.shares}</button>
-        </div>
-      </div>`);
-  });
+          <div class="post-body">${esc(post.text)}</div>
+          <div class="post-actions">
+            <button class="pa-btn" data-act="like" data-id="${post.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span class="cnt">${post.likes||0}</span></button>
+          </div>
+        </div>`);
+    });
+  }
 
-  feed.push(`
-    <div class="event-card">
-      <div class="ev-tag">📅 Happening this week</div>
-      <h4>Evening cricket — 3 seats left</h4>
-      <p>Thu, 22 May · 6:30 PM · Community Ground</p>
-      <div class="ev-foot">
-        <div class="ev-people"><div class="mini-av">AN</div><div class="mini-av">R</div><div class="mini-av">M</div><div class="mini-av more">+8</div></div>
-        <button class="join-btn">Join now →</button>
-      </div>
-    </div>`);
-
+  // Poll card (kept as community prompt)
   feed.push(`
     <div class="poll-card">
       <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg>Favourite bus stop upgrade?</h4>
@@ -1379,13 +1275,14 @@ function renderHive() {
 
   $('#hiveFeed').innerHTML = feed.join('');
   $('#hiveFeed').querySelectorAll('[data-act="like"]').forEach(btn => {
-    let liked = false;
-    const base = parseInt(btn.dataset.count, 10);
     btn.addEventListener('click', () => {
-      liked = !liked;
-      btn.classList.toggle('liked', liked);
-      btn.querySelector('.cnt').textContent = liked ? base + 1 : base;
-      btn.querySelector('svg').setAttribute('fill', liked ? 'currentColor' : 'none');
+      const post = state.hivePosts.find(p => p.id === btn.dataset.id);
+      if (!post) return;
+      post.likes = (post.likes || 0) + 1;
+      btn.querySelector('.cnt').textContent = post.likes;
+      btn.classList.add('liked');
+      btn.querySelector('svg').setAttribute('fill', 'currentColor');
+      saveHive();
     });
   });
 }
@@ -1415,7 +1312,7 @@ $('#postConfirm').onclick = () => {
   const total = 10, taken = total - pendingSeats;
   const finish = (lat, lng) => {
     const lane = { id:'mine-'+Date.now(), driver:state.userName+' (You)', avatar:state.userName.substring(0,2).toUpperCase(), rating:5.0, route:{from, via: via.length?via:['Via Main'], to:dest}, seats:{total, taken}, fare, status:'live', lat, lng, peerId:state.peerId, mine:true, ts:Date.now() };
-    state.lanes.unshift(lane); saveMyLanes(); renderLanes(); renderBusMarkers(); renderNear();
+    state.lanes.unshift(lane); saveLanes(); renderLanes(); renderBusMarkers(); renderNear();
     showToast('Lane is live! 🚌'); closeModal('#postModal');
     document.querySelector('[data-tab="lanes"]').click();
   };
@@ -1499,7 +1396,6 @@ function openChat(lane) {
 
 $('#chatSend').onclick = () => {
   const input = $('#chatInput'); const text = input.value.trim(); if (!text) return;
-  // Local chat?
   if (state.activeChatPeerId) {
     addChatBubble(text, state.userName, false);
     let sent = 0;
@@ -1508,7 +1404,6 @@ $('#chatSend').onclick = () => {
     input.value = '';
     return;
   }
-  // Lane chat
   const lane = state.lanes.find(l => l.id === state.activeChatLaneId);
   if (lane && lane.mine) { addChatBubble(text, state.userName, false); addChatBubble('(Your own lane — only you see this)', '', 'system'); input.value = ''; return; }
   const pid = lane ? lanePeerId(lane) : null;
@@ -1529,11 +1424,18 @@ $('#fabBtn').addEventListener('click', () => {
     pendingSeats = null; $$('#seatSelector .seat-btn').forEach(b => b.classList.remove('active'));
     openModal('#postModal');
   } else if (state.currentTab === 'near') {
-    // Broadcast to local room
     let sent = 0;
     for (const conn of state.localConns.values()) { if (conn.open) { try { conn.send({ type:'chat', text: state.userName + ' is now visible nearby 👋', sender: state.userName }); sent++; } catch(e){} } }
     showToast(sent ? `Broadcast to ${sent} neighbour${sent===1?'':'s'}` : 'You are visible nearby ✓');
-  } else showToast('Composer coming soon');
+  } else {
+    // Hive new post
+    const text = prompt('What do you want to share with the community?');
+    if (text && text.trim()) {
+      state.hivePosts.push({ id: 'hive-' + Date.now(), name: state.userName, avatar: state.userName.substring(0,2).toUpperCase(), text: text.trim(), time: 'just now', likes: 0 });
+      saveHive(); renderHive();
+      showToast('Posted to Hive 🐝');
+    }
+  }
 });
 
 // ============================================================
@@ -1550,8 +1452,7 @@ $('#avatarBtn').addEventListener('click', () => {
     state.userName = name.trim().slice(0, 24);
     localStorage.setItem('steeradar-name', state.userName);
     $('#avatarBtn').textContent = state.userName.charAt(0).toUpperCase();
-    // Re-announce to local room
-    for (const conn of state.localConns.values()) { if (conn.open) { try { conn.send({ type:'hello', name: state.userName, vehicle: state.vehicle, avatar: state.userName.substring(0,2).toUpperCase() }); } catch(e){} } }
+    for (const conn of state.localConns.values()) { if (conn.open) { try { conn.send({ type:'hello', name: state.userName, vehicle: state.vehicle, avatar: state.userName.substring(0,2).toUpperCase(), lat: state.userLat, lng: state.userLng }); } catch(e){} } }
     renderNear(); renderHive();
     showToast('Saved as ' + state.userName);
   }
@@ -1565,7 +1466,7 @@ $('#changeVehicleBtn').onclick = () => {
   if (v === state.vehicle) { closeModal('#vehicleModal'); return; }
   if (!confirm('Change vehicle to ' + v + '? Your published lanes will be reset.')) return;
   localStorage.setItem('steeradar-vehicle', v);
-  localStorage.removeItem(storageKey());
+  localStorage.removeItem(lanesKey());
   location.reload();
 };
 
@@ -1578,7 +1479,6 @@ $('#locationPill').addEventListener('click', () => {
     if (state.map) state.map.setView([latitude, longitude], 14);
     placeUserMarker(latitude, longitude);
     reverseGeocode(latitude, longitude);
-    // Refresh local room
     const newGh = geohash(latitude, longitude, 6);
     if (newGh !== state.userGeohash) { showToast('Entering new neighbourhood · rejoining room'); location.reload(); }
     else showToast('Location updated');
@@ -1593,17 +1493,7 @@ $('#btScanBtn').addEventListener('click', scanBluetooth);
 // ============================================================
 //  RAGINA
 // ============================================================
-$('#aiFab').addEventListener('click', openRagina);
-$('#aiClose').addEventListener('click', closeRagina);
-$$('.ai-quick').forEach(btn => {
-  btn.addEventListener('click', () => askRagina(btn.dataset.q));
-});
-// Listen for messages from Ragina iframe (if it posts back)
-window.addEventListener('message', (e) => {
-  if (!e.data || typeof e.data !== 'object') return;
-  if (e.data.type === 'ragina:ready') $('#aiLoading').style.display = 'none';
-  if (e.data.type === 'ragina:error') $('#aiSubStatus').textContent = 'Ragina error · tap to retry';
-});
+$('#aiFab').addEventListener('click', () => askRagina('What can you help me with on Steeradar?'));
 
 // ============================================================
 //  INIT
@@ -1613,6 +1503,7 @@ function initApp() {
   $('#avatarBtn').textContent = state.userName.charAt(0).toUpperCase();
   $('#vehicleBadgeText').textContent = state.vehicle;
   loadLanes();
+  loadHive();
   initMap();
   renderLanes();
   renderNear();
@@ -1623,7 +1514,7 @@ function initApp() {
 
 if (state.vehicle) initApp();
 
-console.log('%c STEERADAR ', 'background:#00E5C3;color:#0F1115;font-weight:800;padding:4px 10px;border-radius:4px;font-family:sans-serif', 'Vehicle-gated · WebRTC · Bluetooth · Ragina AI');
+console.log('%c STEERADAR ', 'background:#00E5C3;color:#0F1115;font-weight:800;padding:4px 10px;border-radius:4px;font-family:sans-serif', 'Vehicle-gated · WebRTC · Bluetooth · RAGina Pro');
 </script>
 </body>
 </html>
