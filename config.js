@@ -1,49 +1,31 @@
-// ================================================================
 // config.js — Steeradar shared configuration
-// ================================================================
-// This file is the single source of truth for the app's cloud DB,
-// map styles, and app-wide defaults. Every other script reads
-// from window.STEERADAR — so you only edit values HERE.
-// ================================================================
-
 window.STEERADAR = {
-
-  // ─────────────────────────────────────────────────────────────
-  //  Cloud DB (Google Apps Script + Sheets)
-  // ─────────────────────────────────────────────────────────────
-  // Deployed as: Web app · Execute as Me · Who has access: Anyone
-  // Ping test:   YOUR_URL?action=ping&key=steeradar-secret-2026
-  // Expected:    {"data":"pong"}
-  SHEET_API_URL: 'https://script.google.com/macros/s/AKfycbzTo6G1JiL2MQnDFp_D53-vlLa5Ec01OTAO9aLu8uzdXOw0CbpF2d_r2InI_95_odgC/exec',
-
-  // Must EXACTLY match SECRET_KEY inside your Apps Script Code.gs
+  SHEET_API_URL: 'https://script.google.com/macros/s/AKfycbwMv45uY5nlbXRL12H-zZxfu9KeVIm2o9i3n_kqfw9Xd-4KfS_YK4iD67GfGbmCYtix/exec',
   SHEET_WEBHOOK_SECRET: 'steeradar-secret-2026',
-
-  // Ship with cloud sync ON by default.
-  // Users can still toggle it off in Settings → Universal DB.
   CLOUD_SYNC_DEFAULT: true,
 
-  // ─────────────────────────────────────────────────────────────
-  //  App metadata
-  // ─────────────────────────────────────────────────────────────
-  APP_NAME:    'Steeradar',
-  APP_VERSION: 'v3.0',
-  LOGO_URL:    'https://raw.githubusercontent.com/suryasticsai/Steeradar/main/steerardar-logo.png',
+  APP_NAME: 'Steeradar',
+  APP_VERSION: 'v6.0',
+  LOGO_URL: 'https://raw.githubusercontent.com/suryasticsai/Steeradar/main/steerardar-logo.png',
 
-  // ─────────────────────────────────────────────────────────────
-  //  Map
-  // ─────────────────────────────────────────────────────────────
   MAP_STYLE_BRIGHT: 'https://tiles.openfreemap.org/styles/bright',
   MAP_STYLE_DARK:   'https://tiles.openfreemap.org/styles/dark',
-  DEFAULT_CENTER:   { lat: 12.9716, lng: 77.5946 },  // Bengaluru
+  DEFAULT_CENTER:   { lat: 12.9716, lng: 77.5946 },
   DEFAULT_ZOOM:     12,
 
-  // ─────────────────────────────────────────────────────────────
-  //  Behaviour
-  // ─────────────────────────────────────────────────────────────
-  CLOUD_POLL_INTERVAL_MS: 15000,   // how often to re-fetch from Sheets
-  TOAST_DURATION_MS:      2200,    // how long toasts stay visible
-  LOCAL_ROOM_SLOTS:       20,      // geohash mesh slot count
-  GEOHASH_PRECISION:      6,       // ~1 km × 0.6 km per cell
+  CLOUD_POLL_INTERVAL_MS: 15000,
+  LIVE_POLL_INTERVAL_MS:  5000,
+  PRESENCE_INTERVAL_MS:   20000,
+  TOAST_DURATION_MS:      2400,
+  LOCAL_ROOM_SLOTS:       20,
+  GEOHASH_PRECISION:      6,
 
+  VEHICLE_TYPES: [
+    { id: 'bus',   label: 'Bus',   emoji: '🚌', seats: 40, color: '#0D9488' },
+    { id: 'car',   label: 'Car',   emoji: '🚗', seats: 4,  color: '#4F46E5' },
+    { id: 'auto',  label: 'Auto',  emoji: '🛺', seats: 3,  color: '#D97706' },
+    { id: 'bike',  label: 'Bike',  emoji: '🏍️', seats: 1,  color: '#DC2626' },
+    { id: 'walk',  label: 'Walk',  emoji: '🚶', seats: 1,  color: '#7C3AED' },
+    { id: 'event', label: 'Event', emoji: '🎉', seats: 20, color: '#DB2777' },
+  ],
 };
