@@ -1,6 +1,5 @@
 /* ============================================================
-   STEERADAR — App Logic v2
-   Light-first · Apps Script DB · WebRTC Hive · Settings panel
+   STEERADAR v3 — Universal DB + Deepstash UI + bug fixes
    ============================================================ */
 
 (() => {
@@ -13,12 +12,14 @@ const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 }[c]));
 
+// Toast — fixed, single-instance, clean variant
 let _toastTimer = null;
 const showToast = (msg, variant = '', duration = 2200) => {
   const t = $('#toast');
   if (!t) return;
   t.textContent = msg;
-  t.className = 'toast show ' + variant;
+  if (variant) t.dataset.variant = variant; else delete t.dataset.variant;
+  t.classList.add('show');
   if (_toastTimer) clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => {
     t.classList.remove('show');
@@ -26,7 +27,7 @@ const showToast = (msg, variant = '', duration = 2200) => {
   }, duration);
 };
 
-// ---------------- Custom dialogs ----------------
+// Custom dialogs
 let _dialogResolve = null;
 function openDialog({ title, message = '', input = null, okText = 'OK', cancelText = 'Cancel', danger = false }) {
   return new Promise((resolve) => {
@@ -45,7 +46,8 @@ function openDialog({ title, message = '', input = null, okText = 'OK', cancelTe
     const okBtn = $('#dialogOk');
     okBtn.textContent = okText;
     okBtn.className = danger ? 'btn-danger' : 'btn-ok';
-    $('#dialogCancel').textContent = cancelText;
+    $('#dialogCancel').style.display = cancelText ? 'block' : 'none';
+    $('#dialogCancel').textContent = cancelText || 'Cancel';
     $('#dialogOverlay').classList.add('active');
   });
 }
@@ -57,15 +59,8 @@ function closeDialog(result) {
     r(result);
   }
 }
-function confirmDialog(title, message, danger = false) {
-  return openDialog({ title, message, okText: 'Confirm', danger });
-}
-function promptDialog(title, defaultValue = '', placeholder = '') {
-  return openDialog({ title, input: placeholder || defaultValue });
-}
-function alertDialog(title, message) {
-  return openDialog({ title, message, cancelText: '', okText: 'OK' });
-}
+const confirmDialog = (title, message, danger = false) => openDialog({ title, message, okText: 'Confirm', danger });
+const promptDialog = (title, defaultValue = '', placeholder = '') => openDialog({ title, input: placeholder || defaultValue });
 
 const validateVehicle = (v) => /^[A-Z0-9]{4,15}$/i.test(v.replace(/[\s-]/g, ''));
 const normalizeVehicle = (v) => v.replace(/[\s-]/g, '').toUpperCase();
@@ -80,45 +75,40 @@ function distanceM(a, b) {
 
 const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz';
 function geohash(lat, lng, precision = 6) {
-  let latR = [-90, 90], lngR = [-180, 180];
-  let hash = '', bit = 0, ch = 0, even = true;
+  let latR = [-90, 90], lngR = [-180, 180], hash = '', bit = 0, ch = 0, even = true;
   while (hash.length < precision) {
-    if (even) {
-      const mid = (lngR[0] + lngR[1]) / 2;
-      if (lng >= mid) { ch = (ch << 1) + 1; lngR[0] = mid; } else { ch = ch << 1; lngR[1] = mid; }
-    } else {
-      const mid = (latR[0] + latR[1]) / 2;
-      if (lat >= mid) { ch = (ch << 1) + 1; latR[0] = mid; } else { ch = ch << 1; latR[1] = mid; }
-    }
+    if (even) { const m = (lngR[0] + lngR[1]) / 2; if (lng >= m) { ch = (ch << 1) + 1; lngR[0] = m; } else { ch = ch << 1; lngR[1] = m; } }
+    else { const m = (latR[0] + latR[1]) / 2; if (lat >= m) { ch = (ch << 1) + 1; latR[0] = m; } else { ch = ch << 1; latR[1] = m; } }
     even = !even;
     if (++bit === 5) { hash += BASE32[ch]; bit = 0; ch = 0; }
   }
   return hash;
 }
 
-// ---------------- Theme engine ----------------
+// ---------------- Theme ----------------
+function getMapStyle() {
+  const pref = localStorage.getItem('steeradar-map-style') || 'bright';
+  if (pref === 'dark') return 'https://tiles.openfreemap.org/styles/dark';
+  return 'https://tiles.openfreemap.org/styles/bright';
+}
+
 function applyTheme(mode) {
-  localStorage.setItem('steeradar-theme', mode);
   const resolved = mode === 'auto'
     ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
     : mode;
   document.documentElement.setAttribute('data-theme', resolved);
+  localStorage.setItem('steeradar-theme', mode);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', resolved === 'dark' ? '#0F1115' : '#F7F8FC');
-  if (state.mapLibreLayer && state.map) {
-    try { state.map.removeLayer(state.mapLibreLayer); } catch {}
-    const mapStyle = getMapStyle();
-    state.mapLibreLayer = L.maplibreGL({ style: mapStyle, interactive: false }).addTo(state.map);
-    state.mapLibreLayer.bringToBack();
-  }
+  if (meta) meta.setAttribute('content', resolved === 'dark' ? '#0A0B0E' : '#FFFFFF');
 }
-function getMapStyle() {
-  const pref = localStorage.getItem('steeradar-map-style');
-  if (pref === 'dark') return 'https://tiles.openfreemap.org/styles/dark';
-  if (pref === 'bright') return 'https://tiles.openfreemap.org/styles/bright';
-  return document.documentElement.getAttribute('data-theme') === 'dark'
-    ? 'https://tiles.openfreemap.org/styles/dark'
-    : 'https://tiles.openfreemap.org/styles/bright';
+
+function refreshMapStyle() {
+  if (!state.map) return;
+  if (state.mapLibreLayer) {
+    try { state.map.removeLayer(state.mapLibreLayer); } catch {}
+  }
+  state.mapLibreLayer = L.maplibreGL({ style: getMapStyle(), interactive: false }).addTo(state.map);
+  state.mapLibreLayer.bringToBack();
 }
 
 // ---------------- State ----------------
@@ -127,6 +117,7 @@ const state = {
   userName: localStorage.getItem('steeradar-name') || '',
   lanes: [],
   hivePosts: [],
+  likedPosts: new Set(JSON.parse(localStorage.getItem('steeradar-liked') || '[]')),
   peer: null, peerId: null,
   localPeer: null, localPeerId: null,
   localRoomPrefix: null, localSlot: null,
@@ -141,16 +132,18 @@ const state = {
   busMarkers: [], userMarker: null,
   userLat: null, userLng: null, userGeohash: null,
   currentTab: 'pulse',
-  btDevices: []
+  btDevices: [],
+  cloudSyncTimer: null
 };
 
-// ---------------- Cloud sync (Apps Script) ----------------
+// ---------------- Cloud (Apps Script) ----------------
 const cloud = {
   url: localStorage.getItem('steeradar-cloud-url') || '',
-  key: localStorage.getItem('steeradar-cloud-key') || 'change-this-to-a-random-string',
+  key: localStorage.getItem('steeradar-cloud-key') || '',
   enabled: localStorage.getItem('steeradar-cloud-enabled') === 'true',
+
   async call(action, params = {}) {
-    if (!this.url) return null;
+    if (!this.url || !this.enabled) return null;
     try {
       const res = await fetch(this.url, {
         method: 'POST',
@@ -160,13 +153,78 @@ const cloud = {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       return data.data;
-    } catch (e) { console.warn('Cloud sync failed:', e); return null; }
+    } catch (e) { console.warn('Cloud:', e); return null; }
   },
-  async fetchLanes() { return this.enabled ? (await this.call('list', { sheet: 'lanes' }) || []) : []; },
-  async pushLane(lane) { if (this.enabled && lane.mine) this.call('insert', { sheet: 'lanes', row: lane }); },
-  async fetchHive() { return this.enabled ? (await this.call('list', { sheet: 'hive' }) || []) : []; },
-  async pushHive(post) { if (this.enabled) this.call('insert', { sheet: 'hive', row: post }); }
+
+  async fetchLanes() { return (await this.call('list', { sheet: 'lanes' })) || []; },
+  async fetchHive() { return (await this.call('list', { sheet: 'hive' })) || []; },
+  async pushLane(lane) { if (lane.mine) this.call('insert', { sheet: 'lanes', row: lane }); },
+  async pushHive(post) { this.call('insert', { sheet: 'hive', row: post }); },
+  async removeLane(id) { this.call('delete', { sheet: 'lanes', id }); }
 };
+
+async function syncFromCloud(silent = true) {
+  if (!cloud.enabled) return;
+  if (!silent) showToast('Syncing…');
+  const [cLanes, cHive] = await Promise.all([cloud.fetchLanes(), cloud.fetchHive()]);
+
+  // Merge lanes — cloud rows are authoritative, mark local-only as mine
+  const cloudIds = new Set((cLanes || []).map(l => l.id));
+  const mineLocal = state.lanes.filter(l => l.mine);
+  const merged = [];
+
+  // Add mine first (local, then overlay cloud version if exists)
+  mineLocal.forEach(l => merged.push(l));
+
+  // Add cloud lanes (not ours or ours-with-same-id)
+  (cLanes || []).forEach(l => {
+    const left = Number(l.total) - Number(l.taken);
+    const lane = {
+      id: String(l.id),
+      driver: l.driver,
+      vehicle: l.vehicle || '',
+      avatar: (l.driver || 'D').substring(0, 2).toUpperCase(),
+      rating: 5.0,
+      route: {
+        from: l.from || '',
+        via: l.via ? String(l.via).split('|').filter(Boolean) : [],
+        to: l.to || ''
+      },
+      seats: { total: Number(l.total) || 10, taken: Number(l.taken) || 0 },
+      fare: Number(l.fare) || 0,
+      status: l.status || 'live',
+      lat: Number(l.lat),
+      lng: Number(l.lng),
+      peerId: l.peerId || null,
+      mine: l.vehicle === state.vehicle,
+      ts: Number(l.ts) || Date.now()
+    };
+    // Skip if we already have it as mine
+    if (!merged.find(m => m.id === lane.id)) merged.push(lane);
+  });
+
+  state.lanes = merged;
+
+  // Merge hive
+  const hiveIds = new Set(state.hivePosts.map(p => p.id));
+  (cHive || []).forEach(p => {
+    if (!hiveIds.has(p.id)) {
+      state.hivePosts.push({
+        id: String(p.id),
+        name: p.name || 'Driver',
+        avatar: p.avatar || 'D',
+        title: p.title || '',
+        text: p.text || '',
+        tags: p.tags ? String(p.tags).split('|').filter(Boolean) : [],
+        time: p.time || 'just now',
+        likes: Number(p.likes) || 0,
+        ts: Number(p.ts) || Date.now()
+      });
+    }
+  });
+
+  renderLanes(); renderBusMarkers(); renderNear(); renderHive();
+}
 
 // ---------------- Onboarding ----------------
 function initOnboarding() {
@@ -204,21 +262,21 @@ function initOnboarding() {
 const lanesKey = () => 'steeradar-lanes-' + state.vehicle;
 const hiveKey  = () => 'steeradar-hive-' + state.vehicle;
 function loadLanes() { try { state.lanes = JSON.parse(localStorage.getItem(lanesKey()) || '[]'); } catch { state.lanes = []; } }
-function saveLanes() { localStorage.setItem(lanesKey(), JSON.stringify(state.lanes)); }
+function saveLanes() { localStorage.setItem(lanesKey(), JSON.stringify(state.lanes.filter(l => l.mine))); }
 function loadHive() { try { state.hivePosts = JSON.parse(localStorage.getItem(hiveKey()) || '[]'); } catch { state.hivePosts = []; } }
 function saveHive() { localStorage.setItem(hiveKey(), JSON.stringify(state.hivePosts)); }
+function saveLiked() { localStorage.setItem('steeradar-liked', JSON.stringify([...state.likedPosts])); }
 function loadName() { if (!state.userName) { state.userName = 'Driver ' + state.vehicle.slice(-4); localStorage.setItem('steeradar-name', state.userName); } }
 
 // ---------------- Dedupe ----------------
 function dedupeLanes() {
   const seen = new Set();
   state.lanes = state.lanes.filter(l => {
-    const key = l.mine ? `mine-${l.route.to}` : `${l.driver}|${l.route.to}|${l.fare}`;
+    const key = l.id || `${l.driver}|${l.route?.to}|${l.fare}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
-  saveLanes();
 }
 function dedupeHive() {
   const seen = new Set();
@@ -227,11 +285,10 @@ function dedupeHive() {
     seen.add(p.id);
     return true;
   });
-  saveHive();
 }
 
 // ============================================================
-//  PEER A — Vehicle ID (lane chats)
+//  PEER (lane chats + local mesh + hive broadcast)
 // ============================================================
 const lanePeerId = (lane) => lane.peerId || ('steeradar-veh-' + (lane.mine ? state.vehicle : lane.id));
 
@@ -270,7 +327,7 @@ function attachConnHandlers(conn) {
       if (!state.hivePosts.find(p => p.id === data.post.id)) {
         state.hivePosts.push(data.post);
         saveHive(); renderHive();
-        showToast(`${data.post.name}: ${data.post.text.slice(0, 40)}…`);
+        showToast(`${data.post.name}: ${(data.post.title || data.post.text || '').slice(0, 40)}…`);
       }
     }
   });
@@ -291,14 +348,11 @@ function notify(title, body) {
   if (!document.hidden) return;
   if (!('Notification' in window)) return;
   if (Notification.permission !== 'granted') return;
-  const pref = localStorage.getItem('steeradar-notif-chat') !== 'false';
-  if (!pref) return;
+  if (localStorage.getItem('steeradar-notif-chat') === 'false') return;
   try { new Notification(title, { body, icon: 'https://raw.githubusercontent.com/suryasticsai/Steeradar/main/steerardar-logo.png' }); } catch {}
 }
 
-// ============================================================
-//  PEER B — Geohash local mesh
-// ============================================================
+// ---------------- Local mesh ----------------
 const LOCAL_ROOM_SLOTS = 20;
 let localRescanTimer = null;
 
@@ -397,20 +451,14 @@ function updateLocalPeers() {
 
 function broadcastToAllPeers(payload) {
   let sent = 0;
-  for (const conn of state.connections.values()) {
-    if (conn.open) { try { conn.send(payload); sent++; } catch {} }
-  }
-  for (const conn of state.localConns.values()) {
-    if (conn.open) { try { conn.send(payload); sent++; } catch {} }
-  }
+  for (const conn of state.connections.values()) if (conn.open) { try { conn.send(payload); sent++; } catch {} }
+  for (const conn of state.localConns.values()) if (conn.open) { try { conn.send(payload); sent++; } catch {} }
   return sent;
 }
 
-// ============================================================
-//  WEB BLUETOOTH
-// ============================================================
+// ---------------- Bluetooth ----------------
 async function scanBluetooth() {
-  if (!navigator.bluetooth) { showToast('Web Bluetooth not supported', 'error'); return; }
+  if (!navigator.bluetooth) { showToast('Web Bluetooth not supported on this device', 'error'); return; }
   const btn = $('#btScanBtn');
   btn.disabled = true; btn.textContent = 'Scanning…';
   try {
@@ -427,7 +475,6 @@ async function scanBluetooth() {
       device.addEventListener('gattserverdisconnected', () => {
         const e = state.btDevices.find(d => d.id === device.id);
         if (e) { e.connected = false; renderBluetooth(); }
-        showToast((device.name || 'Device') + ' disconnected');
       });
     } catch {}
   } catch (err) {
@@ -445,7 +492,7 @@ function renderBluetooth() {
       <div class="bt-icon">${d.connected ? '🔗' : '📶'}</div>
       <div class="bt-info">
         <div class="bt-name">${esc(d.name)}</div>
-        <div class="bt-meta">${d.connected ? 'Connected' : 'RSSI ' + d.rssi + ' dBm'} · ${esc(d.id.slice(0, 10))}…</div>
+        <div class="bt-meta">${d.connected ? 'Connected' : 'RSSI ' + d.rssi + ' dBm'}</div>
       </div>
       <button class="bt-action" data-action="toggle">${d.connected ? 'Drop' : 'Connect'}</button>
     </div>`).join('');
@@ -462,20 +509,7 @@ function renderBluetooth() {
   });
 }
 
-// ============================================================
-//  RAGINA
-// ============================================================
-function openRagina() {
-  const orb = document.querySelector('.ragina-orb, .ragina-toggle, [class*="ragina"][class*="orb"]');
-  if (orb) { orb.click(); return; }
-  const alt = document.querySelector('[class*="ragina"]');
-  if (alt) { alt.click(); return; }
-  showToast('RAGina loading…');
-}
-
-// ============================================================
-//  TAB NAV
-// ============================================================
+// ---------------- Tabs ----------------
 function initTabs() {
   $$('.nav-item').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -484,6 +518,7 @@ function initTabs() {
       $$('.nav-item').forEach(b => b.classList.toggle('active', b === btn));
       $$('.view').forEach(v => v.classList.toggle('active', v.id === tab + 'View'));
       updateFab();
+      hideLaneCard();
       if (tab === 'pulse' && state.map) setTimeout(() => state.map.invalidateSize(), 150);
     });
   });
@@ -503,9 +538,12 @@ function updateFab() {
   else { label.textContent = 'New post'; sub.textContent = 'Share with the community'; }
 }
 
-// ============================================================
-//  MAP
-// ============================================================
+function hideLaneCard() {
+  const card = $('#mapLaneCard');
+  if (card) card.classList.remove('show');
+}
+
+// ---------------- Map ----------------
 function initMap() {
   state.map = L.map('map', { zoomControl: false, attributionControl: false, center: [12.95, 77.65], zoom: 12 });
   if (typeof L.maplibreGL === 'function') {
@@ -566,6 +604,7 @@ function renderBusMarkers() {
   state.busMarkers.forEach(m => state.map.removeLayer(m));
   state.busMarkers = [];
   filteredLanes().forEach(lane => {
+    if (!lane.lat || !lane.lng) return;
     const occ = lane.seats.taken / lane.seats.total;
     const isFull = occ >= 0.85 || (lane.seats.total - lane.seats.taken) === 0;
     const icon = L.divIcon({
@@ -586,7 +625,7 @@ function showLaneCard(lane) {
   card.innerHTML = `
     <button class="close-x" id="mapCardClose">✕</button>
     <h3>${esc(lane.route.to)}</h3>
-    <div class="route">🚌 ${esc(lane.route.from)} → ${esc(lane.route.via.join(' → '))} → ${esc(lane.route.to)}</div>
+    <div class="route">🚌 ${esc(lane.route.from)} → ${esc((lane.route.via || []).join(' → '))} → ${esc(lane.route.to)}</div>
     <div class="stats">
       <div class="stat ${isFull ? 'coral' : 'teal'}">${isFull ? 'Full' : left + ' seats left'}</div>
       <div class="stat coral">₹${lane.fare}</div>
@@ -596,15 +635,13 @@ function showLaneCard(lane) {
       <button class="btn-request" style="flex:1" id="mapReqBtn" ${isFull ? 'disabled' : ''}>＋ Request</button>
     </div>`;
   card.classList.add('show');
-  $('#mapCardClose').onclick = () => card.classList.remove('show');
-  $('#mapChatBtn').onclick = () => { card.classList.remove('show'); openChat(lane); };
-  $('#mapReqBtn').onclick = () => { card.classList.remove('show'); openRequest(lane); };
+  $('#mapCardClose').onclick = hideLaneCard;
+  $('#mapChatBtn').onclick = () => { hideLaneCard(); openChat(lane); };
+  $('#mapReqBtn').onclick = () => { hideLaneCard(); openRequest(lane); };
   state.map.setView([lane.lat, lane.lng], Math.max(state.map.getZoom(), 13), { animate: true });
 }
 
-// ============================================================
-//  LANES FEED
-// ============================================================
+// ---------------- Lanes feed ----------------
 function renderLanes() {
   dedupeLanes();
   const list = $('#laneList');
@@ -633,7 +670,7 @@ function renderLanes() {
           </div>
           <div class="info">
             <div class="destination">${esc(lane.route.to)}</div>
-            <div class="route"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 12h18"/></svg>${esc(lane.route.from)} → ${esc(lane.route.via.join(' → '))} → ${esc(lane.route.to)}</div>
+            <div class="route"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 12h18"/></svg>${esc(lane.route.from)} → ${esc((lane.route.via || []).join(' → '))} → ${esc(lane.route.to)}</div>
             <span class="fare-tag">₹ ${lane.fare}</span>
           </div>
         </div>
@@ -659,9 +696,7 @@ function renderLanes() {
   });
 }
 
-// ============================================================
-//  NEAR
-// ============================================================
+// ---------------- Near ----------------
 function renderNear() {
   const wrap = $('#proximityWrap');
   const localPeers = [...state.localPeers.entries()].filter(([k]) => !k.endsWith(':pending'));
@@ -751,9 +786,7 @@ function renderNear() {
   });
 }
 
-// ============================================================
-//  LOCAL CHAT
-// ============================================================
+// ---------------- Local chat ----------------
 function openLocalChat(peerId) {
   state.activeChatPeerId = peerId;
   state.activeChatLaneId = null;
@@ -767,34 +800,48 @@ function openLocalChat(peerId) {
   openModal('#chatModal');
 }
 
-// ============================================================
-//  HIVE
-// ============================================================
+// ---------------- Hive (Deepstash-style) ----------------
 function renderHive() {
   dedupeHive();
+
+  // Stories
   const seenDrivers = new Set();
   const driverStories = [];
   for (const lane of state.lanes) {
     if (seenDrivers.has(lane.driver)) continue;
     seenDrivers.add(lane.driver);
-    driverStories.push({ label: lane.driver.split(' ')[0], avatar: lane.avatar });
-    if (driverStories.length >= 4) break;
+    driverStories.push({ label: lane.driver.split(' ')[0], avatar: lane.avatar, driver: lane.driver });
+    if (driverStories.length >= 5) break;
   }
   const stories = [{ label: 'Add', avatar: '＋', add: true }, ...driverStories];
   $('#storyRow').innerHTML = stories.map(s => `
-    <div class="story"><div class="story-ring"><div class="story-inner ${s.add ? 'add' : ''}">${esc(s.avatar)}</div></div><div class="story-name">${esc(s.label)}</div></div>`).join('');
+    <div class="story" ${s.driver ? `data-driver="${esc(s.driver)}"` : ''}>
+      <div class="story-ring"><div class="story-inner ${s.add ? 'add' : ''}">${esc(s.avatar)}</div></div>
+      <div class="story-name">${esc(s.label)}</div>
+    </div>`).join('');
+  $('#storyRow').querySelectorAll('[data-driver]').forEach(el => {
+    el.addEventListener('click', () => {
+      const driver = el.dataset.driver;
+      const posts = state.hivePosts.filter(p => p.name === driver);
+      if (posts.length) showPostDetail(posts[0]);
+      else showToast('No posts from ' + driver + ' yet');
+    });
+  });
 
   const hour = new Date().getHours();
   const g = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   $('#greetingText').textContent = `${g}, ${state.userName.split(' ')[0]} 👋`;
 
+  $('#hiveCount').textContent = state.hivePosts.length + ' post' + (state.hivePosts.length === 1 ? '' : 's');
+
   const feed = [];
   if (state.hivePosts.length === 0) {
-    feed.push(`<div class="empty"><div class="icon">🐝</div><p>No posts yet. Tap <b>New post</b> to share something.</p></div>`);
+    feed.push(`<div class="empty"><div class="icon">🐝</div><p>No posts yet. Tap <b>New post</b> to share something with your community.</p></div>`);
   } else {
     state.hivePosts.slice().reverse().forEach(post => {
+      const liked = state.likedPosts.has(post.id);
       feed.push(`
-        <div class="post-card">
+        <div class="post-card" data-post-id="${esc(post.id)}">
           <div class="post-head">
             <div class="post-avatar">${esc(post.avatar)}</div>
             <div class="post-meta">
@@ -802,10 +849,12 @@ function renderHive() {
               <div class="post-time">${esc(post.time)}</div>
             </div>
           </div>
+          ${post.title ? `<div class="post-title">${esc(post.title)}</div>` : ''}
           <div class="post-body">${esc(post.text)}</div>
+          ${post.tags && post.tags.length ? `<div class="post-tags">${post.tags.map(t => `<span class="post-tag">${esc(t)}</span>`).join('')}</div>` : ''}
           <div class="post-actions">
-            <button class="pa-btn" data-act="like" data-id="${post.id}">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            <button class="pa-btn ${liked ? 'liked' : ''}" data-act="like" data-id="${esc(post.id)}">
+              <svg viewBox="0 0 24 24" fill="${liked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
               <span class="cnt">${post.likes || 0}</span>
             </button>
           </div>
@@ -813,26 +862,79 @@ function renderHive() {
     });
   }
   $('#hiveFeed').innerHTML = feed.join('');
+
+  // Tap post → detail
+  $('#hiveFeed').querySelectorAll('.post-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('[data-act="like"]')) return;
+      const post = state.hivePosts.find(p => p.id === card.dataset.postId);
+      if (post) showPostDetail(post);
+    });
+  });
+
+  // Like toggle — one like per user
   $('#hiveFeed').querySelectorAll('[data-act="like"]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const post = state.hivePosts.find(p => p.id === btn.dataset.id);
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      const post = state.hivePosts.find(p => p.id === id);
       if (!post) return;
-      post.likes = (post.likes || 0) + 1;
-      btn.querySelector('.cnt').textContent = post.likes;
-      btn.classList.add('liked');
-      btn.querySelector('svg').setAttribute('fill', 'currentColor');
-      saveHive();
+      if (state.likedPosts.has(id)) {
+        state.likedPosts.delete(id);
+        post.likes = Math.max(0, (post.likes || 0) - 1);
+      } else {
+        state.likedPosts.add(id);
+        post.likes = (post.likes || 0) + 1;
+      }
+      saveLiked(); saveHive();
+      renderHive();
     });
   });
 }
 
-function publishHivePost(text) {
+function showPostDetail(post) {
+  const liked = state.likedPosts.has(post.id);
+  $('#postDetailContent').innerHTML = `
+    <div class="pd-head">
+      <div class="pd-avatar">${esc(post.avatar)}</div>
+      <div>
+        <div class="pd-name">${esc(post.name)}</div>
+        <div class="pd-time">${esc(post.time)}</div>
+      </div>
+    </div>
+    ${post.title ? `<h2>${esc(post.title)}</h2>` : ''}
+    <div class="pd-body">${esc(post.text).replace(/\n/g, '<br>')}</div>
+    ${post.tags && post.tags.length ? `<div class="post-tags" style="margin-bottom:16px">${post.tags.map(t => `<span class="post-tag">${esc(t)}</span>`).join('')}</div>` : ''}
+    <div class="pd-actions">
+      <button class="pa-btn ${liked ? 'liked' : ''}" id="pdLike">
+        <svg viewBox="0 0 24 24" fill="${liked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        <span>${post.likes || 0}</span>
+      </button>
+    </div>`;
+  $('#pdLike').onclick = () => {
+    if (state.likedPosts.has(post.id)) {
+      state.likedPosts.delete(post.id);
+      post.likes = Math.max(0, (post.likes || 0) - 1);
+    } else {
+      state.likedPosts.add(post.id);
+      post.likes = (post.likes || 0) + 1;
+    }
+    saveLiked(); saveHive();
+    renderHive();
+    showPostDetail(post);
+  };
+  openModal('#postDetailModal');
+}
+
+function publishHivePost(title, text, tags) {
   if (!text || !text.trim()) return;
   const post = {
     id: 'hive-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
     name: state.userName,
     avatar: state.userName.substring(0, 2).toUpperCase(),
+    title: (title || '').trim(),
     text: text.trim(),
+    tags: tags || [],
     time: 'just now',
     likes: 0,
     ts: Date.now(),
@@ -841,16 +943,25 @@ function publishHivePost(text) {
   state.hivePosts.push(post);
   saveHive();
   const sent = broadcastToAllPeers({ type: 'hive-post', post });
-  if (cloud.enabled) cloud.pushHive(post);
+  if (cloud.enabled) cloud.pushHive({ id: post.id, name: post.name, avatar: post.avatar, title: post.title, text: post.text, tags: post.tags.join('|'), time: post.time, likes: 0, ts: post.ts });
   renderHive();
-  showToast(sent > 0 ? `Posted to Hive · reached ${sent} peer${sent === 1 ? '' : 's'} 🐝` : 'Posted to Hive 🐝', 'success');
+  showToast(sent > 0 ? `Posted · reached ${sent} peer${sent === 1 ? '' : 's'} 🐝` : 'Posted to Hive 🐝', 'success');
 }
 
-// ============================================================
-//  MODALS
-// ============================================================
+// ---------------- Modals ----------------
 const openModal = (sel) => $(sel).classList.add('active');
 const closeModal = (sel) => $(sel).classList.remove('active');
+
+function initModalCloseButtons() {
+  $$('[data-close]').forEach(btn => {
+    btn.addEventListener('click', () => closeModal(btn.dataset.close));
+  });
+  $$('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.classList.remove('active');
+    });
+  });
+}
 
 // Post lane
 let pendingSeats = null;
@@ -861,8 +972,6 @@ function initPostModal() {
       pendingSeats = parseInt(btn.dataset.seats, 10);
     });
   });
-  $('#postModal').addEventListener('click', (e) => { if (e.target === $('#postModal')) closeModal('#postModal'); });
-  $('#postCancel').onclick = () => closeModal('#postModal');
   $('#postConfirm').onclick = () => {
     const dest = $('#pDest').value.trim();
     const routeStr = $('#pRoute').value.trim();
@@ -873,11 +982,28 @@ function initPostModal() {
     const from = via.shift() || 'Your location';
     const total = 10, taken = total - pendingSeats;
     const finish = (lat, lng) => {
+      // Remove my previous lane with same destination
       state.lanes = state.lanes.filter(l => !(l.mine && l.route.to === dest));
-      const lane = { id: 'mine-' + Date.now(), driver: state.userName + ' (You)', avatar: state.userName.substring(0, 2).toUpperCase(), rating: 5.0, route: { from, via: via.length ? via : ['Via Main'], to: dest }, seats: { total, taken }, fare, status: 'live', lat, lng, peerId: state.peerId, mine: true, ts: Date.now() };
+      const lane = {
+        id: 'mine-' + Date.now(),
+        driver: state.userName + ' (You)',
+        avatar: state.userName.substring(0, 2).toUpperCase(),
+        rating: 5.0,
+        route: { from, via: via.length ? via : ['Via Main'], to: dest },
+        seats: { total, taken },
+        fare, status: 'live', lat, lng,
+        peerId: state.peerId, mine: true, ts: Date.now(),
+        vehicle: state.vehicle
+      };
       state.lanes.unshift(lane);
       saveLanes();
-      if (cloud.enabled) cloud.pushLane(lane);
+      if (cloud.enabled) {
+        cloud.pushLane({
+          id: lane.id, driver: lane.driver, vehicle: state.vehicle,
+          from: lane.route.from, via: lane.route.via.join('|'), to: lane.route.to,
+          total, taken, fare, lat, lng, status: 'live', ts: lane.ts
+        });
+      }
       renderLanes(); renderBusMarkers(); renderNear(); renderHive();
       showToast('Lane is live! 🚌', 'success');
       closeModal('#postModal');
@@ -903,7 +1029,6 @@ function openRequest(lane) {
   openModal('#requestModal');
 }
 function initRequestModal() {
-  $('#reqCancel').onclick = () => closeModal('#requestModal');
   $('#reqConfirm').onclick = () => {
     if (!requestLane) return;
     const msg = $('#reqMsg').value.trim();
@@ -970,7 +1095,7 @@ function initChatModal() {
       addChatBubble(text, state.userName, false);
       let sent = 0;
       for (const conn of state.localConns.values()) if (conn.open) { try { conn.send({ type: 'chat', text, sender: state.userName }); sent++; } catch {} }
-      if (!sent) addChatBubble('(No neighbours connected — not delivered)', '', 'system');
+      if (!sent) addChatBubble('(No neighbours connected)', '', 'system');
       input.value = '';
       return;
     }
@@ -984,44 +1109,47 @@ function initChatModal() {
     const pid = lane ? lanePeerId(lane) : null;
     const conn = pid ? state.connections.get(pid) : null;
     if (conn && conn.open) { try { conn.send({ type: 'chat', text, sender: state.userName }); addChatBubble(text, state.userName, false); } catch { showToast('Send failed', 'error'); } }
-    else { showToast('Not connected', 'error'); addChatBubble(text, state.userName, false); addChatBubble('(Message not delivered — peer offline)', '', 'system'); }
+    else { showToast('Not connected', 'error'); addChatBubble(text, state.userName, false); addChatBubble('(Not delivered — peer offline)', '', 'system'); }
     input.value = '';
   };
   $('#chatInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#chatSend').click(); });
-  $('#chatClose').onclick = () => { closeModal('#chatModal'); state.activeChatLaneId = null; state.activeChatPeerId = null; $('#chatAvatar').classList.remove('bt'); };
 }
 
-// ============================================================
-//  SETTINGS
-// ============================================================
+// ---------------- Settings ----------------
 function initSettings() {
   $('#avatarBtn').onclick = () => openSettings();
+  $('#vehicleBadge').onclick = () => openSettings();
   $('#settingsSave').onclick = saveSettings;
 
+  // Live theme preview
   $$('#setTheme button').forEach(b => b.addEventListener('click', () => {
     $$('#setTheme button').forEach(x => x.classList.toggle('active', x === b));
+    applyTheme(b.dataset.value); // live
   }));
   $$('#setMapStyle button').forEach(b => b.addEventListener('click', () => {
     $$('#setMapStyle button').forEach(x => x.classList.toggle('active', x === b));
+    localStorage.setItem('steeradar-map-style', b.dataset.value);
+    refreshMapStyle();
   }));
 
   $('#setClearLanes').onclick = async () => {
     const ok = await confirmDialog('Clear my lanes?', 'Delete all your published lanes on this device?', true);
     if (!ok) return;
+    state.lanes.filter(l => l.mine).forEach(l => { if (cloud.enabled) cloud.removeLane(l.id); });
     state.lanes = state.lanes.filter(l => !l.mine);
     saveLanes();
     renderLanes(); renderBusMarkers(); renderNear(); renderHive();
     showToast('Your lanes cleared', 'success');
   };
   $('#setResetAll').onclick = async () => {
-    const ok = await confirmDialog('Reset all data?', 'This deletes vehicle, lanes, Hive posts, settings. You\'ll see onboarding again.', true);
+    const ok = await confirmDialog('Reset all data?', 'This deletes vehicle, lanes, Hive posts, settings.', true);
     if (!ok) return;
     Object.keys(localStorage).filter(k => k.startsWith('steeradar-')).forEach(k => localStorage.removeItem(k));
     location.reload();
   };
 }
 
-async function openSettings() {
+function openSettings() {
   $('#setName').value = state.userName;
   $('#setVehicle').value = state.vehicle;
 
@@ -1033,7 +1161,6 @@ async function openSettings() {
 
   $('#setNotifChat').checked = localStorage.getItem('steeradar-notif-chat') !== 'false';
   $('#setNotifSeats').checked = localStorage.getItem('steeradar-notif-seats') !== 'false';
-  $('#setNotifNear').checked = localStorage.getItem('steeradar-notif-near') === 'true';
   $('#setShareGps').checked = localStorage.getItem('steeradar-share-gps') !== 'false';
   $('#setVisible').checked = localStorage.getItem('steeradar-visible') !== 'false';
   $('#setGhost').checked = localStorage.getItem('steeradar-ghost') === 'true';
@@ -1055,24 +1182,13 @@ function saveSettings() {
     setTimeout(() => location.reload(), 400);
   }
 
-  const theme = [...$$('#setTheme button')].find(b => b.classList.contains('active'))?.dataset.value || 'light';
-  applyTheme(theme);
-
-  const mapStyle = [...$$('#setMapStyle button')].find(b => b.classList.contains('active'))?.dataset.value || 'bright';
-  localStorage.setItem('steeradar-map-style', mapStyle);
-  if (state.mapLibreLayer && state.map) {
-    try { state.map.removeLayer(state.mapLibreLayer); } catch {}
-    state.mapLibreLayer = L.maplibreGL({ style: getMapStyle(), interactive: false }).addTo(state.map);
-    state.mapLibreLayer.bringToBack();
-  }
-
   localStorage.setItem('steeradar-notif-chat', $('#setNotifChat').checked);
   localStorage.setItem('steeradar-notif-seats', $('#setNotifSeats').checked);
-  localStorage.setItem('steeradar-notif-near', $('#setNotifNear').checked);
   localStorage.setItem('steeradar-share-gps', $('#setShareGps').checked);
   localStorage.setItem('steeradar-visible', $('#setVisible').checked);
   localStorage.setItem('steeradar-ghost', $('#setGhost').checked);
 
+  const wasEnabled = cloud.enabled;
   cloud.enabled = $('#setCloudSync').checked;
   cloud.url = $('#setCloudUrl').value.trim();
   cloud.key = $('#setCloudKey').value.trim();
@@ -1083,11 +1199,11 @@ function saveSettings() {
   renderBusMarkers(); renderLanes(); renderNear(); renderHive();
   closeModal('#settingsModal');
   showToast('Settings saved', 'success');
+
+  if (!wasEnabled && cloud.enabled) syncFromCloud();
 }
 
-// ============================================================
-//  FAB + header
-// ============================================================
+// ---------------- FAB & header ----------------
 function initFabAndHeader() {
   $('#fabBtn').onclick = async () => {
     if (state.currentTab === 'pulse' || state.currentTab === 'lanes') {
@@ -1099,19 +1215,21 @@ function initFabAndHeader() {
       const sent = broadcastToAllPeers({ type: 'chat', text: state.userName + ' is now visible nearby 👋', sender: state.userName });
       showToast(sent ? `Broadcast to ${sent} neighbour${sent === 1 ? '' : 's'}` : 'You are visible nearby ✓', 'success');
     } else {
-      const text = await promptDialog('New Hive post', '', 'What do you want to share?');
-      if (text && text.trim()) publishHivePost(text);
+      // Hive new post — ask title + text
+      const title = await promptDialog('New post — title', '', 'A short headline (optional)');
+      if (title === false) return;
+      const text = await promptDialog('Post body', '', 'What do you want to share?');
+      if (text === false || !text.trim()) return;
+      publishHivePost(title || '', text, []);
     }
   };
 
   $('#notifBtn').onclick = async () => {
     if (!('Notification' in window)) { showToast('Notifications not supported', 'error'); return; }
-    if (Notification.permission === 'granted') { showToast('Notifications are on'); return; }
+    if (Notification.permission === 'granted') { showToast('Notifications are already on'); return; }
     const p = await Notification.requestPermission();
     showToast(p === 'granted' ? 'Notifications enabled' : 'Notifications blocked', p === 'granted' ? 'success' : 'error');
   };
-
-  $('#vehicleBadge').onclick = () => openSettings();
 
   $('#locationPill').onclick = () => {
     if (!navigator.geolocation) { showToast('Location unavailable', 'error'); return; }
@@ -1130,13 +1248,10 @@ function initFabAndHeader() {
 
   $('#mapRefresh').onclick = function () {
     this.classList.add('spinning');
-    if (state.mapLibreLayer && state.map) {
-      try { state.map.removeLayer(state.mapLibreLayer); } catch {}
-      state.mapLibreLayer = L.maplibreGL({ style: getMapStyle(), interactive: false }).addTo(state.map);
-      state.mapLibreLayer.bringToBack();
-    }
+    refreshMapStyle();
     state.map.invalidateSize();
     renderBusMarkers();
+    hideLaneCard();
     setTimeout(() => this.classList.remove('spinning'), 900);
     showToast('Map refreshed', 'success');
   };
@@ -1154,21 +1269,7 @@ function initFabAndHeader() {
   $('#dialogInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#dialogOk').click(); });
 }
 
-// ============================================================
-//  INIT
-// ============================================================
-async function mergeCloudData() {
-  if (!cloud.enabled) return;
-  showToast('Syncing with cloud…');
-  const [cloudLanes, cloudHive] = await Promise.all([cloud.fetchLanes(), cloud.fetchHive()]);
-  const localIds = new Set(state.lanes.map(l => l.id));
-  (cloudLanes || []).forEach(l => { if (!localIds.has(l.id)) state.lanes.push({ ...l, mine: false }); });
-  const localHiveIds = new Set(state.hivePosts.map(p => p.id));
-  (cloudHive || []).forEach(p => { if (!localHiveIds.has(p.id)) state.hivePosts.push(p); });
-  dedupeLanes(); dedupeHive();
-  renderLanes(); renderBusMarkers(); renderNear(); renderHive();
-}
-
+// ---------------- Boot ----------------
 function initApp() {
   loadName();
   $('#avatarBtn').textContent = state.userName.charAt(0).toUpperCase();
@@ -1188,12 +1289,18 @@ function initApp() {
   updateFab();
   initPeer();
 
-  mergeCloudData();
+  // Cloud sync — initial + polling every 15s
+  if (cloud.enabled) {
+    syncFromCloud();
+    clearInterval(state.cloudSyncTimer);
+    state.cloudSyncTimer = setInterval(() => syncFromCloud(true), 15000);
+  }
 }
 
 function boot() {
   initOnboarding();
   initTabs();
+  initModalCloseButtons();
   initPostModal();
   initRequestModal();
   initChatModal();
@@ -1202,7 +1309,7 @@ function boot() {
 
   if (state.vehicle) initApp();
 
-  console.log('%c STEERADAR v2 ', 'background:#00B39A;color:#fff;font-weight:800;padding:4px 10px;border-radius:4px;font-family:sans-serif', 'Light-first · Cloud sync · WebRTC Hive · Settings');
+  console.log('%c STEERADAR v3 ', 'background:#0D9488;color:#fff;font-weight:800;padding:4px 10px;border-radius:4px;font-family:sans-serif', 'Universal DB · Deepstash UI · RAGina removed');
 }
 
 if (document.readyState === 'complete' || document.readyState === 'interactive') setTimeout(boot, 0);
