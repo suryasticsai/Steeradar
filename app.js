@@ -138,8 +138,26 @@ const state = {
   userLat: null, userLng: null, userGeohash: null,
   currentTab: 'pulse',
   btDevices: [],
-  cloudSyncTimer: null
+  cloudSyncTimer: null,
+  presenceTimer: null,
+  cloudPeers: new Map(),
+  peerMarkers: [],
+  chatTargets: new Map(),
+  pendingLikes: new Set()
 };
+
+const timeAgo = (ts, fallback = 'just now') => {
+  const t = Number(ts);
+  if (!t) return fallback;
+  const m = Math.floor((Date.now() - t) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + ' min ago';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + ' h ago';
+  return Math.floor(h / 24) + ' d ago';
+};
+const fmtDist = (m) => m >= 1000 ? (m / 1000).toFixed(m >= 10000 ? 0 : 1) + ' km' : Math.round(m) + ' m';
+const LANE_TTL_MS = 24 * 3600 * 1000;
 
 // ---------------- Cloud (Apps Script, reads config.js) ----------------
 const cloud = {
@@ -186,7 +204,9 @@ const cloud = {
 
   async fetchLanes() { return (await this.call('list', { sheet: 'lanes' })) || []; },
   async fetchHive()  { return (await this.call('list', { sheet: 'hive' }))  || []; },
-  async pushLane(lane) { if (lane.mine) this.call('insert', { sheet: 'lanes', row: lane }); },
+  async pushLane(lane) { return this.call('insert', { sheet: 'lanes', row: lane }); },
+  async likePost(id, delta) { return this.call('like', { sheet: 'hive', id, delta }); },
+  async heartbeat(me) { return this.call('presence', me); },
   async pushHive(post) { this.call('insert', { sheet: 'hive', row: post }); },
   async removeLane(id) { this.call('delete', { sheet: 'lanes', id }); },
 
@@ -205,6 +225,7 @@ async function syncFromCloud(silent = true) {
   const mineLocal = state.lanes.filter(l => l.mine);
   const merged = [...mineLocal];
   (cLanes || []).forEach(l => {
+    if (Date.now() - (Number(l.ts) || 0) > LANE_TTL_MS) return;      // stale lane
     const lane = {
       id: String(l.id),
       driver: l.driver,
@@ -221,7 +242,7 @@ async function syncFromCloud(silent = true) {
       status: l.status || 'live',
       lat: Number(l.lat),
       lng: Number(l.lng),
-      peerId: l.peerId || null,
+      peerId: l.peerId || (l.vehicle ? 'steeradar-veh-' + l.vehicle : null),
       mine: l.vehicle === state.vehicle,
       ts: Number(l.ts) || Date.now()
     };
@@ -230,9 +251,13 @@ async function syncFromCloud(silent = true) {
   state.lanes = merged;
 
   // Merge hive
-  const hiveIds = new Set(state.hivePosts.map(p => p.id));
+  const hiveById = new Map(state.hivePosts.map(p => [p.id, p]));
   (cHive || []).forEach(p => {
-    if (!hiveIds.has(p.id)) {
+    const existing = hiveById.get(String(p.id));
+    if (existing) {
+      // cloud is the source of truth for the like count (skip while our own like is in flight)
+      if (!state.pendingLikes.has(existing.id)) existing.likes = Number(p.likes) || 0;
+    } else {
       state.hivePosts.push({
         id: String(p.id),
         name: p.name || 'Driver',
@@ -247,16 +272,60 @@ async function syncFromCloud(silent = true) {
     }
   });
 
+  state.hivePosts.sort((a, b) => (Number(a.ts) || 0) - (Number(b.ts) || 0));
+  saveHive();
   renderLanes(); renderBusMarkers(); renderNear(); renderHive();
+}
+
+// ---------------- Presence (who is online + where) ----------------
+async function presenceTick() {
+  if (!cloud.enabled || !state.vehicle || document.hidden) return;
+  const hidden = localStorage.getItem('steeradar-ghost') === 'true' ||
+                 localStorage.getItem('steeradar-visible') === 'false';
+  const shareGps = localStorage.getItem('steeradar-share-gps') !== 'false';
+  const me = { vehicle: state.vehicle, name: state.userName,
+               avatar: (state.userName || 'DR').substring(0, 2).toUpperCase(),
+               peerId: state.peerId || ('steeradar-veh-' + state.vehicle) };
+  if (hidden) me.hide = true;
+  else if (shareGps && state.userLat != null) { me.lat = state.userLat; me.lng = state.userLng; }
+  const others = await cloud.heartbeat(me);
+  if (!Array.isArray(others)) return;
+  state.cloudPeers = new Map(others.map(o => [o.vehicle, o]));
+  renderPeerMarkers(); renderNear();
+}
+
+function renderPeerMarkers() {
+  if (!state.map) return;
+  state.peerMarkers.forEach(m => state.map.removeLayer(m));
+  state.peerMarkers = [];
+  state.cloudPeers.forEach(p => {
+    if (p.lat == null || p.lng == null) return;
+    const icon = L.divIcon({ className: '', iconSize: [34, 34], iconAnchor: [17, 17],
+      html: `<div style="width:34px;height:34px;border-radius:50%;background:#0D9488;color:#fff;font:700 12px sans-serif;display:flex;align-items:center;justify-content:center;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3)">${esc(p.avatar)}</div>` });
+    const m = L.marker([p.lat, p.lng], { icon }).addTo(state.map);
+    m.on('click', () => openCloudPeerChat(p));
+    state.peerMarkers.push(m);
+  });
+}
+
+function openCloudPeerChat(p) {
+  const lane = { id: 'peer-' + p.vehicle, driver: p.name, avatar: p.avatar, peerId: p.peerId,
+                 mine: false, route: { from: '', via: [], to: 'Direct chat' }, seats: { total: 0, taken: 0 } };
+  state.chatTargets.set(lane.id, lane);
+  openChat(lane);
 }
 
 function startCloudPolling() {
   clearInterval(state.cloudSyncTimer);
+  clearInterval(state.presenceTimer);
   if (!cloud.enabled) return;
   state.cloudSyncTimer = setInterval(
     () => syncFromCloud(true),
     CFG.CLOUD_POLL_INTERVAL_MS || 15000
   );
+  clearInterval(state.presenceTimer);
+  presenceTick();
+  state.presenceTimer = setInterval(presenceTick, 20000);
 }
 
 // ---------------- Onboarding ----------------
@@ -594,6 +663,7 @@ function initMap() {
         placeUserMarker(latitude, longitude);
         reverseGeocode(latitude, longitude);
         initLocalRoom(latitude, longitude);
+        presenceTick();
       },
       () => { $('#locText').textContent = 'Bengaluru, Karnataka'; reverseGeocode(12.9716, 77.5946); initLocalRoom(12.9716, 77.5946); },
       { enableHighAccuracy: true, timeout: 8000 }
@@ -734,25 +804,38 @@ function renderLanes() {
 function renderNear() {
   const wrap = $('#proximityWrap');
   const localPeers = [...state.localPeers.entries()].filter(([k]) => !k.endsWith(':pending'));
+  const localVehicles = new Set(localPeers.map(([, p]) => p.vehicle));
+  const cloudPeers = [...state.cloudPeers.values()].filter(p => !localVehicles.has(p.vehicle)).slice(0, 8);
   const nearbyLanes = filteredLanes().filter(l => !l.mine).slice(0, 3);
   const cx = 50, cy = 50, maxR = 40;
-  const items = [];
   const me = { lat: state.userLat, lng: state.userLng };
-  const total = Math.max(localPeers.length + nearbyLanes.length, 1);
+  const hasMe = me.lat != null && me.lng != null;
 
-  localPeers.forEach(([id, peer], i) => {
-    const d = (peer.lat && me.lat) ? distanceM(me, { lat: peer.lat, lng: peer.lng }) : (15 + Math.floor(Math.random() * 35));
-    const angle = (i / total) * 360 - 90;
-    const radius = Math.min((d / 70) * maxR, maxR);
-    const rad = (angle * Math.PI) / 180;
-    items.push({ x: cx + Math.cos(rad) * radius, y: cy + Math.sin(rad) * radius, avatar: peer.avatar, name: peer.name, dist: d, type: 'peer', id });
+  const raw = [];
+  localPeers.forEach(([id, peer]) => {
+    const real = hasMe && peer.lat != null && peer.lng != null;
+    raw.push({ d: real ? distanceM(me, { lat: peer.lat, lng: peer.lng }) : (15 + Math.floor(Math.random() * 35)), real,
+               avatar: peer.avatar, name: peer.name, type: 'peer', id });
   });
-  nearbyLanes.forEach((lane, i) => {
-    const d = (lane.lat && me.lat) ? distanceM(me, { lat: lane.lat, lng: lane.lng }) : (25 + Math.floor(Math.random() * 40));
-    const angle = ((localPeers.length + i) / total) * 360 - 90;
-    const radius = Math.min((d / 70) * maxR, maxR);
+  cloudPeers.forEach(p => {
+    const real = hasMe && p.lat != null && p.lng != null;
+    raw.push({ d: real ? distanceM(me, { lat: p.lat, lng: p.lng }) : 0, real, unknown: !real,
+               avatar: p.avatar, name: p.name, type: 'cloud', id: p.vehicle });
+  });
+  nearbyLanes.forEach(lane => {
+    const real = hasMe && lane.lat && lane.lng;
+    raw.push({ d: real ? distanceM(me, { lat: lane.lat, lng: lane.lng }) : (25 + Math.floor(Math.random() * 40)), real,
+               avatar: lane.avatar, name: lane.driver, type: 'lane', id: lane.id, coral: true });
+  });
+
+  // scale the radar so far-away drivers still fit (min ~70 m ring)
+  const scaleM = Math.max(70, ...raw.filter(r => r.real).map(r => r.d));
+  const total = Math.max(raw.length, 1);
+  const items = raw.map((r, i) => {
+    const angle = (i / total) * 360 - 90;
+    const radius = r.unknown ? maxR * 0.85 : Math.min((r.d / scaleM) * maxR, maxR);
     const rad = (angle * Math.PI) / 180;
-    items.push({ x: cx + Math.cos(rad) * radius, y: cy + Math.sin(rad) * radius, avatar: lane.avatar, name: lane.driver, dist: d, type: 'lane', id: lane.id, coral: true });
+    return { ...r, dist: r.d, x: cx + Math.cos(rad) * radius, y: cy + Math.sin(rad) * radius };
   });
   state.btDevices.slice(0, 2).forEach(d => {
     const dist = 5 + Math.floor(Math.random() * 20);
@@ -769,16 +852,17 @@ function renderNear() {
     html.push(`
       <div class="peer-bubble" style="left:${it.x}%;top:${it.y}%;transform:translate(-50%,-50%);animation-delay:${i * 0.06}s" data-type="${it.type}" data-id="${esc(it.id)}">
         <div class="p-avatar ${it.coral ? 'coral' : ''} ${it.bt ? 'bt' : ''}">${esc(it.avatar)}</div>
-        <div class="p-label"><span class="dist">${it.dist} m</span><br>${esc(it.name.slice(0, 14))}</div>
+        <div class="p-label"><span class="dist">${it.unknown ? "online" : fmtDist(it.dist)}</span><br>${esc(it.name.slice(0, 14))}</div>
       </div>`);
   });
-  html.push(`<div class="connected-pill"><span class="live-dot"></span> ${localPeers.length} local · ${nearbyLanes.length} lanes${state.btDevices.length ? ' · ' + state.btDevices.length + ' BT' : ''}</div>`);
+  html.push(`<div class="connected-pill"><span class="live-dot"></span> ${localPeers.length + cloudPeers.length} online · ${nearbyLanes.length} lanes${state.btDevices.length ? ' · ' + state.btDevices.length + ' BT' : ''}</div>`);
   wrap.innerHTML = html.join('');
 
   wrap.querySelectorAll('.peer-bubble').forEach(b => {
     b.addEventListener('click', () => {
       if (b.dataset.type === 'lane') { const lane = state.lanes.find(l => l.id === b.dataset.id); if (lane) openChat(lane); }
       else if (b.dataset.type === 'peer') { openLocalChat(b.dataset.id); }
+      else if (b.dataset.type === 'cloud') { const p = state.cloudPeers.get(b.dataset.id); if (p) openCloudPeerChat(p); }
       else if (b.dataset.type === 'bt') { showToast('Bluetooth device — tap Scan to connect'); }
     });
   });
@@ -879,7 +963,7 @@ function renderHive() {
             <div class="post-avatar">${esc(post.avatar)}</div>
             <div class="post-meta">
               <div class="post-name">${esc(post.name)}</div>
-              <div class="post-time">${esc(post.time)}</div>
+              <div class="post-time">${esc(timeAgo(post.ts, post.time))}</div>
             </div>
           </div>
           ${post.title ? `<div class="post-title">${esc(post.title)}</div>` : ''}
@@ -910,17 +994,24 @@ function renderHive() {
       const id = btn.dataset.id;
       const post = state.hivePosts.find(p => p.id === id);
       if (!post) return;
-      if (state.likedPosts.has(id)) {
-        state.likedPosts.delete(id);
-        post.likes = Math.max(0, (post.likes || 0) - 1);
-      } else {
-        state.likedPosts.add(id);
-        post.likes = (post.likes || 0) + 1;
-      }
-      saveLiked(); saveHive();
+      toggleLike(post);
       renderHive();
     });
   });
+}
+
+function toggleLike(post) {
+  const id = post.id;
+  const delta = state.likedPosts.has(id) ? -1 : 1;
+  if (delta < 0) { state.likedPosts.delete(id); post.likes = Math.max(0, (post.likes || 0) - 1); }
+  else           { state.likedPosts.add(id);    post.likes = (post.likes || 0) + 1; }
+  saveLiked(); saveHive();
+  if (cloud.enabled) {
+    state.pendingLikes.add(id);
+    cloud.likePost(id, delta).then(r => {
+      if (r && typeof r.likes === 'number') { post.likes = r.likes; saveHive(); renderHive(); }
+    }).finally(() => state.pendingLikes.delete(id));
+  }
 }
 
 function showPostDetail(post) {
@@ -930,7 +1021,7 @@ function showPostDetail(post) {
       <div class="pd-avatar">${esc(post.avatar)}</div>
       <div>
         <div class="pd-name">${esc(post.name)}</div>
-        <div class="pd-time">${esc(post.time)}</div>
+        <div class="pd-time">${esc(timeAgo(post.ts, post.time))}</div>
       </div>
     </div>
     ${post.title ? `<h2>${esc(post.title)}</h2>` : ''}
@@ -943,14 +1034,7 @@ function showPostDetail(post) {
       </button>
     </div>`;
   $('#pdLike').onclick = () => {
-    if (state.likedPosts.has(post.id)) {
-      state.likedPosts.delete(post.id);
-      post.likes = Math.max(0, (post.likes || 0) - 1);
-    } else {
-      state.likedPosts.add(post.id);
-      post.likes = (post.likes || 0) + 1;
-    }
-    saveLiked(); saveHive();
+    toggleLike(post);
     renderHive();
     showPostDetail(post);
   };
@@ -1018,6 +1102,8 @@ function initPostModal() {
     const from = via.shift() || 'Your location';
     const total = 10, taken = total - pendingSeats;
     const finish = (lat, lng) => {
+      const replaced = state.lanes.filter(l => l.mine && l.route.to === dest);
+      if (cloud.enabled) replaced.forEach(l => cloud.removeLane(l.id));
       state.lanes = state.lanes.filter(l => !(l.mine && l.route.to === dest));
       const lane = {
         id: 'mine-' + Date.now(),
@@ -1035,8 +1121,9 @@ function initPostModal() {
       if (cloud.enabled) cloud.pushLane({
         id: lane.id, driver: lane.driver, vehicle: state.vehicle,
         from: lane.route.from, via: lane.route.via.join('|'), to: lane.route.to,
-        total, taken, fare, lat, lng, status: 'live', ts: lane.ts
-      });
+        total, taken, fare, lat, lng, status: 'live', ts: lane.ts,
+        peerId: state.peerId
+      }).then(r => { if (r === null) showToast('Saved here only — cloud sync failed' + (cloud.lastError ? ': ' + cloud.lastError : ''), 'error'); });
       renderLanes(); renderBusMarkers(); renderNear(); renderHive();
       showToast('Lane is live! 🚌', 'success');
       closeModal('#postModal');
@@ -1132,7 +1219,7 @@ function initChatModal() {
       input.value = '';
       return;
     }
-    const lane = state.lanes.find(l => l.id === state.activeChatLaneId);
+    const lane = state.lanes.find(l => l.id === state.activeChatLaneId) || state.chatTargets.get(state.activeChatLaneId);
     if (lane && lane.mine) {
       addChatBubble(text, state.userName, false);
       if (!state._ownLaneHintShown) { addChatBubble('(Your own lane — only you see this)', '', 'system'); state._ownLaneHintShown = true; }
