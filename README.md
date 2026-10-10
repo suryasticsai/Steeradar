@@ -6,12 +6,13 @@
 
 ### Live community rides. Peer chat. Local mesh. Universal DB.
 
-**A vehicle-gated, serverless-first community network — built in plain HTML, CSS & JavaScript.**
+**A vehicle-gated, modular, serverless-first community network — built in plain HTML, CSS & JavaScript.**
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-suryasticsai.github.io-0D9488?style=for-the-badge&logo=github)](https://suryasticsai.github.io/Steeradar/)
 [![License](https://img.shields.io/badge/License-MIT-111827?style=for-the-badge)](./LICENSE)
 [![Made with](https://img.shields.io/badge/Made%20with-Vanilla%20JS-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
-[![No Build](https://img.shields.io/badge/No-Build%20Step-7C3AED?style=for-the-badge)](https://github.com/suryasticsai/Steeradar)
+[![Modules](https://img.shields.io/badge/Modules-11-7C3AED?style=for-the-badge)](./js)
+[![No Build](https://img.shields.io/badge/No-Build%20Step-4F46E5?style=for-the-badge)](https://github.com/suryasticsai/Steeradar)
 
 </div>
 
@@ -30,46 +31,92 @@ Built on plain web primitives — WebRTC, Geolocation, Bluetooth, and a single G
 ## ✨ Features
 
 ### 🚗 Vehicle Gate
-The app doesn't unlock without a valid vehicle number. It becomes your identity — your lanes, your Hive posts, your peer ID. Change it anytime from Settings.
+The app unlocks only after a valid vehicle number. It becomes your identity — your lanes, your Hive posts, your peer ID.
+
+### 📷 Photo Documents
+Optional onboarding step to upload your photo, vehicle photo, number plate, and UPI QR — stored securely on Google Drive.
 
 ### 🗺️ Pulse — Live Community Map
-A clean, bright (or dark) OpenFreeMap canvas with pulsing markers for every active lane. Tap any marker for route, seats, fare, and one-tap Chat / Request. Filters: **Live now · All · Has seats · My lanes**.
+Bright OpenFreeMap canvas with emoji markers for every active lane. Real-time movement animations, pulsing rings, filters: **Live now · All · Has seats · My lanes**.
 
 ### 🛣️ Lanes — Real-Time Driver Feed
-Every active lane as an editorial card with an animated occupancy ring, seat count, route preview, fare tag, driver info, and Chat / Request actions. Your own lanes glow teal with a **YOU** badge.
+Editorial cards with animated occupancy rings, vehicle-type badges, route previews, fare tags, and one-tap Chat / Track / Request. **Edit your own lanes inline.**
+
+### 📍 Live Tracking (Zomato-style)
+Tap **Track** on any lane → OSRM routing draws the real driving path to your pickup, with live distance, ETA, and seat count in a floating HUD.
 
 ### 📡 Near — Local Mesh & Proximity Radar
-Your GPS coordinate becomes a 6-char **geohash** — a ~1 km × 0.6 km cell. Everyone in the same cell joins a shared PeerJS room without any server, chatting instantly. Also includes a **real Web Bluetooth scan** for nearby BLE devices.
+Your GPS coordinate becomes a **geohash** — everyone within ~1 km auto-forms a PeerJS room without any server. Includes **real Web Bluetooth scan**.
 
 ### 🐝 Hive — Community Board
-A Deepstash-style editorial feed of local posts. Story circles for active drivers. Tap any post for detail view. Like counts sync to the universal DB and via WebRTC broadcast.
+Deepstash-style editorial feed. Story circles for active drivers. Single-form composer (heading + body + tags). **Edit and delete your own posts.**
 
-### 🤖 Universal DB (Google Sheets)
-Every lane and post syncs to a Google Sheet via Apps Script. Any device, any browser — everyone sees the same feed within 15 seconds. Configurable in `config.js`.
+### 💬 Peer Chat with Persistence
+Real-time WebRTC delivery + every message saved to the `messages` sheet. Reopening a chat loads the last 50 messages.
 
-### ⚙️ Real Settings Panel
-Tap your avatar for a full sheet: Profile · Appearance (theme + map) · Notifications · Privacy (GPS, ghost mode) · Universal DB · Data (clear / reset). Every switch is honored instantly.
+### ⚙️ Full Settings
+Account (OTP sign-in) · Profile · Appearance (theme + map style) · Notifications · Privacy (GPS, ghost mode, plate visibility) · Universal DB · Data (clear / reset).
+
+### 📋 Hidden Diagnostics
+Long-press the **Steeradar** logo for 600ms → in-app log viewer with **Copy · Clear · Refresh**. Tap the version line 5× in Settings → reveals the cloud endpoint config.
 
 ---
 
-## 🎯 Beyond buses — the real USP
+## 🏗️ Architecture
 
-Steeradar is **not a bus app**. A vehicle number is just one kind of persistent public identifier. The same pattern works for:
+### Modular JS — 11 files, each under 300 lines
 
-| Activity | Identifier | Lane | Fare |
-|---|---|---|---|
-| Community bus | Bus reg number | Route + occupancy | Ticket price |
-| Carpool | Car reg number | Daily commute | Fuel share |
-| Auto pool | Auto reg number | Shared trip | Split meter |
-| Walking group | Group name | Route + pace | Free |
-| Morning jog | Route ID | Pace + meetup | Free |
-| Cycling pack | Pack name | Route + speed | Free |
-| Event shuttle | Event code | Pickup points | Bundled |
-| Delivery coop | Vehicle ID | Delivery route | Per parcel |
-| Farm-to-home | Producer ID | Weekly run | Per basket |
-| School run | Parent group | School route | Free swap |
+```
+js/
+├── api.js          · Network gateway (every fetch goes through here)
+├── store.js        · Shared state, storage, session, utils
+├── logger.js       · In-app console capture + log viewer
+├── auth.js         · OTP login / register flow
+├── onboarding.js   · Vehicle gate + photo step
+├── photos.js       · Image compression + Drive upload
+├── lanes.js        · Post/view lanes, edit, map markers
+├── hive.js         · Posts + likes + edit/delete
+├── chat.js         · WebRTC + persistent messages
+├── presence.js     · Live tracking + geohash mesh
+└── app.js          · Boot, tabs, settings, wiring
+```
 
-**Steeradar is a protocol for community movement.** Fork it, run your own.
+Every module imports only what it needs. Changes to `chat.js` never touch `lanes.js`.
+
+### Peer layers
+
+```
+PEER A — Vehicle ID
+  steeradar-veh-<VEHICLE>
+  Used for: lane chats (1:1 WebRTC)
+
+PEER B — Geohash Room Slot
+  steeradar-loc-<geohash>-<slot 1..20>
+  Used for: local mesh (auto-forms within ~1 km)
+
+PEER C — Bluetooth
+  navigator.bluetooth.requestDevice()
+  Used for: proximity scan of BLE peripherals
+```
+
+### Cloud sync flow
+
+```
+Publish lane → save local + push to Apps Script → row in Google Sheet
+              ↓
+Every 15s:  fetch lanes + posts → merge → re-render
+Every 20s:  heartbeat presence with GPS + vehicle type
+```
+
+### Live tracking flow
+
+```
+Tap Track → draw pickup pin + vehicle pin
+          → OSRM fetch driving route (free, no key)
+          → draw teal dashed polyline
+          → recompute every 8s as vehicle moves
+          → HUD shows distance / ETA / seats
+```
 
 ---
 
@@ -78,15 +125,17 @@ Steeradar is **not a bus app**. A vehicle number is just one kind of persistent 
 | Layer | Technology |
 |---|---|
 | Markup | HTML5 |
-| Styling | Vanilla CSS (Deepstash-inspired, light-first) |
-| Logic | Vanilla JavaScript (ES2020) |
+| Styling | Vanilla CSS (light-first, Deepstash-inspired) |
+| Logic | Vanilla JavaScript (ES Modules, ES2020) |
 | Maps | [Leaflet](https://leafletjs.com/) + [MapLibre GL](https://maplibre.org/) |
-| Tiles | [OpenFreeMap](https://openfreemap.org/) — no API key needed |
+| Tiles | [OpenFreeMap](https://openfreemap.org/) — no API key |
+| Routing | [OSRM](https://project-osrm.org/) — free, no signup |
 | Geocoding | [Nominatim](https://nominatim.org/) (OpenStreetMap) |
 | Real-time chat | [PeerJS](https://peerjs.com/) (WebRTC) |
 | Proximity mesh | Custom geohash + PeerJS slot claiming |
 | Bluetooth | Web Bluetooth API |
 | Universal DB | Google Apps Script + Sheets |
+| Image storage | Google Drive (via Apps Script) |
 | Hosting | GitHub Pages |
 
 **Zero build step. Zero npm. Zero bundlers.**
@@ -113,114 +162,83 @@ python3 -m http.server 8000
 
 ---
 
-## 🗄️ Setting up the Universal DB (Google Sheets)
+## 🗄️ Apps Script Backend Setup
 
-The DB lets every device see the same lanes and posts. It takes about 5 minutes.
+The DB lets every device see the same lanes, posts, messages, and presence. Setup takes ~5 minutes.
 
-### 1. Create the Apps Script project
-1. Go to **[script.new](https://script.new)** — a new Apps Script project opens
-2. Rename it to **Steeradar DB**
-3. Delete all existing code in `Code.gs`
-4. Paste the contents of **[`Code.gs`](./Code.gs)** from this repo
-5. **Ctrl + S** to save
+### 1. Create the project
+1. Open **[script.new](https://script.new)** → rename to **Steeradar DB**
+2. Delete default code → paste the contents of **[`Code.gs`](./Code.gs)**
+3. **Ctrl + S**
 
 ### 2. Authorize + create the Sheet
-1. Function dropdown → select **`setup`** → click **Run**
-2. When prompted: **Review permissions → Advanced → Go to Steeradar DB (unsafe) → Allow**
-3. Watch the Execution log — you'll see:
-   ```
-   Sheet URL: https://docs.google.com/spreadsheets/d/...
-   lanes tab: OK
-   hive tab:  OK
-   Mail: authorized
-   Done.
-   ```
+1. Function dropdown → **`setup`** → **Run**
+2. **Review permissions → Advanced → Go to project → Allow**
+3. Copy the printed Sheet URL
 
-### 3. Verify the backend
-1. Function dropdown → select **`selfTest`** → click **Run**
-2. Log should show:
+### 3. Run the self-test
+1. Function dropdown → **`selfTest`** → **Run**
+2. Expect:
    ```
-   lanes write+read: PASS
-   hive write+read:  PASS
-   cleanup done
+   users    write: PASS
+   sessions write: PASS
+   lanes    write: PASS
+   hive     write: PASS
+   messages write: PASS
+   presence write: PASS
+   trips    write: PASS
    ```
 
 ### 4. Deploy as Web App
-1. **Deploy → New deployment**
-2. Type: **Web app**
-3. Execute as: **Me**
-4. Who has access: **Anyone**
-5. Click **Deploy** → copy the `/exec` URL
+1. **Deploy → New deployment → Web app**
+2. Execute as: **Me**
+3. Who has access: **Anyone**
+4. Copy the `/exec` URL
 
 ### 5. Wire it up
-1. Open **`config.js`** in this repo
-2. Replace `SHEET_API_URL` with your `/exec` URL:
-   ```javascript
-   SHEET_API_URL: 'https://script.google.com/macros/s/AKfyc.../exec',
-   SHEET_WEBHOOK_SECRET: 'steeradar-secret-2026',  // must match Code.gs
-   ```
-3. Commit and push
-4. On the live site, hard refresh → Settings → **Test connection** → should say **✓ Connected**
+Edit `config.js`:
+```javascript
+SHEET_API_URL: 'https://script.google.com/macros/s/AKfyc.../exec',
+SHEET_WEBHOOK_SECRET: 'steeradar-secret-2026',
+```
+
+Commit, push, hard-refresh. Verify in Settings → Universal DB → **Test connection** → **✓ Connected**.
 
 ---
 
-## 🏗️ Architecture
+## 📊 Sheet Schema
 
-### Peer layers
-
-```
-┌───────────────────────────────────────────────────────────────┐
-│  PEER A — Vehicle ID                                          │
-│  steeradar-veh-<VEHICLE>                                      │
-│  Used for: lane chats (direct 1:1 WebRTC)                     │
-├───────────────────────────────────────────────────────────────┤
-│  PEER B — Geohash Room Slot                                   │
-│  steeradar-loc-<geohash>-<slot 1..20>                         │
-│  Used for: local mesh (auto-forms around ~1 km radius)        │
-├───────────────────────────────────────────────────────────────┤
-│  PEER C — Bluetooth                                           │
-│  navigator.bluetooth.requestDevice()                          │
-│  Used for: proximity scan of nearby BLE peripherals           │
-└───────────────────────────────────────────────────────────────┘
-```
-
-### Cloud sync flow
-
-```
-Publish lane → save to localStorage + push to Apps Script → row in Google Sheet
-              ↓
-Every 15 s:  fetch all lanes + posts → merge with local → re-render
-```
-
-### Local mesh flow
-
-```
-GPS → geohash(6) → room prefix → claim slot 1..20
-                                     ↓
-                        scan all other slots every 30 s
-                                     ↓
-                     on connect → exchange hello packets
-                                     ↓
-                            broadcast chat to peers
-```
+| Sheet | Purpose |
+|---|---|
+| **users** | phone, email, name, vehicle, avatar, plate, UPI QR, session refs |
+| **sessions** | Auth tokens (90-day expiry) |
+| **otps** | Login + register OTP audit trail |
+| **lanes** | Live lanes with vehicleType + GPS + lastSeen |
+| **hive** | Community posts + likes |
+| **messages** | Persistent chat history |
+| **presence** | Active vehicles + GPS heartbeat (2-min freshness) |
+| **trips** | Start/end time, distance, fare, rating |
 
 ---
 
-## 🎨 Design Language
+## 🎯 Beyond buses — the real USP
 
-| Token | Value | Usage |
-|---|---|---|
-| Background | `#FFFFFF` | Editorial canvas |
-| Surface | `#F1F3F6` | Soft cards |
-| Text | `#111827` | High contrast |
-| Teal | `#0D9488` | Primary accent |
-| Coral | `#DC2626` | Alerts & fares |
-| Amber | `#D97706` | Fare tags |
-| Violet | `#7C3AED` | AI, Bluetooth |
-| Serif | `Charter / Georgia` | Headlines |
-| Sans | System UI | Body |
+A vehicle number is one kind of persistent public identifier. The same pattern works for:
 
-Light theme is primary. Dark theme available in Settings. Everything is a token — no hardcoded colors.
+| Activity | Identifier | Lane | Fare |
+|---|---|---|---|
+| Community bus | Bus reg | Route + occupancy | Ticket price |
+| Carpool | Car reg | Daily commute | Fuel share |
+| Auto pool | Auto reg | Shared trip | Split meter |
+| Walking group | Group name | Route + pace | Free |
+| Morning jog | Route ID | Pace + meetup | Free |
+| Cycling pack | Pack name | Route + speed | Free |
+| Event shuttle | Event code | Pickup points | Bundled |
+| Delivery coop | Vehicle ID | Delivery route | Per parcel |
+| Farm-to-home | Producer ID | Weekly run | Per basket |
+| School run | Parent group | School route | Free swap |
+
+**Steeradar is a protocol for community movement.** Fork it, run your own.
 
 ---
 
@@ -232,23 +250,38 @@ Light theme is primary. Dark theme available in Settings. Everything is a token 
 - [x] Geohash local mesh (serverless)
 - [x] Real Web Bluetooth scan
 - [x] Universal DB via Google Sheets
-- [x] Deepstash-inspired editorial UI
-- [x] Full Settings panel (theme, privacy, data)
-- [x] Cross-device lane + post sync
-- [ ] Service worker for offline mode
+- [x] Modular 11-file architecture
+- [x] OTP authentication (email)
+- [x] Image uploads (Google Drive)
+- [x] Live tracking (OSRM route lines)
+- [x] In-app diagnostics log viewer
+- [x] Edit / delete lanes and posts
+- [ ] UPI payment flow (scan QR → pay → confirm)
+- [ ] Post-trip ratings
+- [ ] Push notifications (FCM)
 - [ ] PWA install prompt
-- [ ] Encrypted local storage
+- [ ] Offline mode (Service Worker)
 - [ ] Multi-language support
-- [ ] Ride history & receipts
-- [ ] Driver reputation system
-- [ ] Group fare splitting
-- [ ] Own PeerServer for production scale
+- [ ] Self-hosted OSRM
+
+---
+
+## 🔐 Privacy & Security
+
+- **No tracking** — no analytics, no third-party scripts
+- **Vehicle-gated** — no anonymous access
+- **Cloud-optional** — everything works locally if cloud sync is disabled
+- **Ghost mode** — hide your location from the map
+- **Masked plates** — control who sees your number plate
+- **UID-protected** — every write goes through the vehicle identity
+- **Secret-keyed** — Apps Script rejects any request without the correct key
+- **Session tokens** — 90-day, hashed, revocable
 
 ---
 
 ## 🤝 Contributing
 
-Steeradar is intentionally minimal — three files, no build step, one weekend's worth of code. Anyone can read it in one sitting.
+Steeradar is intentionally minimal. No build step, no framework, no lock-in.
 
 ```bash
 git checkout -b feature/amazing-idea
@@ -256,7 +289,7 @@ git commit -m "Add amazing idea"
 git push origin feature/amazing-idea
 ```
 
-Open a PR. Bug reports with browser + device info are especially welcome.
+Open a PR. Bug reports with the in-app log (long-press logo → Copy) are gold.
 
 ---
 
@@ -272,7 +305,7 @@ Open a PR. Bug reports with browser + device info are especially welcome.
 
 </div>
 
-I build open-source tools that solve small, real problems for real people — neighbourhood ride networks, offline-first AI assistants, and privacy-respecting utilities. Steeradar started as a weekend question: *"Can a whole ride-sharing app work without a backend?"* It grew into a working peer-to-peer mesh and a real cross-device product running on GitHub Pages.
+I build open-source tools that solve small, real problems for real people — neighbourhood ride networks, offline-first AI assistants, and privacy-respecting utilities. Steeradar started as a weekend question: *"Can a whole ride-sharing app work without a backend?"* It grew into a modular, working peer-to-peer mesh running entirely on GitHub Pages.
 
 Everything I publish follows three rules:
 
@@ -318,6 +351,7 @@ Free to fork, remix, ship. Attribution appreciated, not required.
 - [Leaflet](https://leafletjs.com/) — the friendliest map library on the web
 - [MapLibre GL](https://maplibre.org/) — the open vector map engine
 - [OpenFreeMap](https://openfreemap.org/) — free, keyless vector tiles
+- [OSRM](https://project-osrm.org/) — open-source routing machine
 - [PeerJS](https://peerjs.com/) — WebRTC made human
 - [OpenStreetMap](https://www.openstreetmap.org/) — the free world map
 - [Nominatim](https://nominatim.org/) — reverse geocoding for everyone
