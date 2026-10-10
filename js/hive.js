@@ -1,5 +1,4 @@
-// js/hive.js — Community board: posts, likes, story circles, detail view.
-// Includes a single-form compose modal (heading + body together).
+// js/hive.js — Community board with edit + delete.
 
 import { api } from './api.js';
 import {
@@ -10,9 +9,9 @@ import {
 
 const CFG = window.STEERADAR || {};
 
-// ─── STATE ───
 let likedPosts = new Set(storage.get('liked', []));
 let pendingLikes = new Set();
+let _editingPost = null;
 
 // ─── PUBLIC: BOOT ───
 export function initHive() {
@@ -31,7 +30,6 @@ function saveLiked() {
 
 // ─── CLOUD SYNC ───
 export async function syncHiveFromCloud() {
-  if (!CFG.CLOUD_SYNC_DEFAULT && !storage.get('cloud-enabled', false)) return;
   const list = await api.listHive();
   if (!Array.isArray(list)) return;
 
@@ -39,9 +37,7 @@ export async function syncHiveFromCloud() {
   list.forEach(p => {
     const existing = byId.get(String(p.id));
     if (existing) {
-      if (!pendingLikes.has(existing.id)) {
-        existing.likes = Number(p.likes) || 0;
-      }
+      if (!pendingLikes.has(existing.id)) existing.likes = Number(p.likes) || 0;
     } else {
       state.hivePosts.push({
         id: String(p.id),
@@ -54,6 +50,7 @@ export async function syncHiveFromCloud() {
         time: p.time || 'just now',
         likes: Number(p.likes) || 0,
         ts: Number(p.ts) || Date.now(),
+        vehicle: p.vehicle || '',
       });
     }
   });
@@ -64,7 +61,7 @@ export async function syncHiveFromCloud() {
   renderHive();
 }
 
-// ─── RENDER FEED ───
+// ─── RENDER ───
 export function renderHive() {
   dedupeHive();
   renderStories();
@@ -116,7 +113,6 @@ export function renderHive() {
     `;
   }).join('');
 
-  // Tap card → detail (unless tapping the like button)
   feed.querySelectorAll('.post-card').forEach(card => {
     card.addEventListener('click', (e) => {
       if (e.target.closest('[data-act="like"]')) return;
@@ -125,7 +121,6 @@ export function renderHive() {
     });
   });
 
-  // Like buttons
   feed.querySelectorAll('[data-act="like"]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -147,11 +142,7 @@ function renderStories() {
   for (const lane of state.lanes) {
     if (seen.has(lane.driver)) continue;
     seen.add(lane.driver);
-    driverStories.push({
-      label: lane.driver.split(' ')[0],
-      avatar: lane.avatar,
-      driver: lane.driver,
-    });
+    driverStories.push({ label: lane.driver.split(' ')[0], avatar: lane.avatar, driver: lane.driver });
     if (driverStories.length >= 5) break;
   }
 
@@ -175,9 +166,8 @@ function renderStories() {
     });
   });
 
-  // "Add" story → open compose modal
   const addStory = row.querySelector('.story:not([data-driver])');
-  if (addStory) addStory.addEventListener('click', openComposeModal);
+  if (addStory) addStory.addEventListener('click', () => openComposeModal());
 }
 
 // ─── GREETING ───
@@ -185,9 +175,7 @@ function renderGreeting() {
   const el = document.getElementById('greetingText');
   if (!el) return;
   const hour = new Date().getHours();
-  const g = hour < 12 ? 'Good morning'
-          : hour < 17 ? 'Good afternoon'
-          : 'Good evening';
+  const g = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const firstName = (state.userName || 'friend').split(' ')[0];
   el.textContent = `${g}, ${firstName} 👋`;
 }
@@ -208,19 +196,16 @@ function toggleLike(post) {
   saveLiked();
   saveHive();
 
-  // Cloud sync in background
-  if (CFG.CLOUD_SYNC_DEFAULT || storage.get('cloud-enabled', false)) {
-    pendingLikes.add(id);
-    api.like(id, delta)
-      .then(r => {
-        if (r && typeof r.likes === 'number') {
-          post.likes = r.likes;
-          saveHive();
-          renderHive();
-        }
-      })
-      .finally(() => pendingLikes.delete(id));
-  }
+  pendingLikes.add(id);
+  api.like(id, delta)
+    .then(r => {
+      if (r && typeof r.likes === 'number') {
+        post.likes = r.likes;
+        saveHive();
+        renderHive();
+      }
+    })
+    .finally(() => pendingLikes.delete(id));
 }
 
 // ─── POST DETAIL ───
@@ -228,6 +213,8 @@ export function showPostDetail(post) {
   const liked = likedPosts.has(post.id);
   const content = document.getElementById('postDetailContent');
   if (!content) return;
+
+  const isMine = isMyPost(post);
 
   content.innerHTML = `
     <div class="pd-head">
@@ -250,6 +237,8 @@ export function showPostDetail(post) {
         </svg>
         <span>${post.likes || 0}</span>
       </button>
+      ${isMine ? '<button class="pd-edit-btn" id="pdEdit">✎ Edit</button>' : ''}
+      ${isMine ? '<button class="pd-edit-btn" id="pdDelete" style="color:var(--coral);border-color:var(--coral)">🗑 Delete</button>' : ''}
     </div>
   `;
 
@@ -259,12 +248,38 @@ export function showPostDetail(post) {
     showPostDetail(post);
   };
 
+  wireHiveEdit(post);
   document.getElementById('postDetailModal')?.classList.add('active');
 }
 
-// ═══════════════════════════════════════════════════════════
-//  COMPOSE MODAL (single form: heading + body)
-// ═══════════════════════════════════════════════════════════
+function isMyPost(post) {
+  return post.vehicle === state.vehicle
+      && (post.phone ? post.phone === state.phone : post.name === state.userName);
+}
+
+function wireHiveEdit(post) {
+  const edit = document.getElementById('pdEdit');
+  const del  = document.getElementById('pdDelete');
+
+  if (edit) edit.onclick = () => {
+    document.getElementById('postDetailModal')?.classList.remove('active');
+    openComposeModal(post);
+  };
+
+  if (del) del.onclick = async () => {
+    if (!confirm('Delete this post?')) return;
+    try { await api.call('delete', { sheet: 'hive', id: post.id }); } catch {}
+    state.hivePosts = state.hivePosts.filter(p => p.id !== post.id);
+    saveHive();
+    renderHive();
+    document.getElementById('postDetailModal')?.classList.remove('active');
+    showToast('Post deleted', 'success');
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  COMPOSE MODAL
+// ═══════════════════════════════════════════════════════════════
 function wireComposeModal() {
   const cancel = document.getElementById('hiveComposeCancel');
   const submit = document.getElementById('hiveComposeSubmit');
@@ -278,7 +293,6 @@ function wireComposeModal() {
   if (cancel) cancel.onclick = closeComposeModal;
   if (submit) submit.onclick = handleComposeSubmit;
 
-  // Enter in heading → move to body
   const heading = document.getElementById('hiveHeading');
   if (heading) {
     heading.addEventListener('keydown', (e) => {
@@ -290,16 +304,18 @@ function wireComposeModal() {
   }
 }
 
-export function openComposeModal() {
+export function openComposeModal(post = null) {
   const modal = document.getElementById('hiveComposeModal');
-  if (!modal) {
-    showToast('Compose modal missing');
-    return;
-  }
+  if (!modal) { showToast('Compose modal missing'); return; }
 
-  document.getElementById('hiveHeading').value = '';
-  document.getElementById('hiveBody').value = '';
-  document.getElementById('hiveTags').value = '';
+  _editingPost = post;
+
+  const headEl = document.querySelector('#hiveComposeModal .modal-head h3');
+  if (headEl) headEl.textContent = post ? 'Edit post' : 'New post';
+
+  document.getElementById('hiveHeading').value = post?.title || '';
+  document.getElementById('hiveBody').value    = post?.text  || '';
+  document.getElementById('hiveTags').value    = post?.tags?.join(', ') || '';
 
   modal.classList.add('active');
   setTimeout(() => document.getElementById('hiveHeading').focus(), 250);
@@ -310,22 +326,33 @@ function closeComposeModal() {
 }
 
 async function handleComposeSubmit() {
-  const title = document.getElementById('hiveHeading').value.trim();
-  const text = document.getElementById('hiveBody').value.trim();
+  const title   = document.getElementById('hiveHeading').value.trim();
+  const text    = document.getElementById('hiveBody').value.trim();
   const tagsRaw = document.getElementById('hiveTags').value.trim();
 
   if (!title && !text) { showToast('Write something first', 'error'); return; }
-  if (!text && title) {
-    // If user only filled heading, treat it as body
-    await publishPost('', title, []);
+
+  const tags = tagsRaw
+    ? tagsRaw.split(',').map(t => t.trim().replace(/^#/, '')).filter(Boolean).slice(0, 5)
+    : [];
+
+  if (_editingPost) {
+    const p = _editingPost;
+    p.title = title;
+    p.text = text || title;
+    p.tags = tags;
+    saveHive();
+    try {
+      await api.call('update', { sheet: 'hive', id: p.id, row: { title, text, tags: tags.join('|') } });
+    } catch {}
+    renderHive();
+    showToast('Post updated', 'success');
   } else {
-    const tags = tagsRaw
-      ? tagsRaw.split(',').map(t => t.trim().replace(/^#/, '')).filter(Boolean).slice(0, 5)
-      : [];
-    await publishPost(title, text, tags);
+    await publishPost(title, text || title, tags);
   }
 
   closeComposeModal();
+  _editingPost = null;
 }
 
 // ─── PUBLISH ───
@@ -351,29 +378,25 @@ export async function publishPost(title, text, tags = []) {
   renderHive();
   showToast('Posted to Hive 🐝', 'success');
 
-  // Broadcast to live peers (if chat.js/presence.js have exposed a bridge)
   if (window.Steeradar?.broadcastToAllPeers) {
     window.Steeradar.broadcastToAllPeers({ type: 'hive-post', post });
   }
 
-  // Cloud push
-  if (CFG.CLOUD_SYNC_DEFAULT || storage.get('cloud-enabled', false)) {
-    const row = {
-      id: post.id,
-      phone: post.phone,
-      name: post.name,
-      avatar: post.avatar,
-      title: post.title,
-      text: post.text,
-      tags: post.tags.join('|'),
-      time: post.time,
-      likes: 0,
-      ts: post.ts,
-      vehicle: state.vehicle,
-    };
-    const r = await api.insertHive(row);
-    if (!r) showToast('Saved locally — cloud: ' + (api.lastError || 'failed'), 'error');
-  }
+  const row = {
+    id: post.id,
+    phone: post.phone,
+    name: post.name,
+    avatar: post.avatar,
+    title: post.title,
+    text: post.text,
+    tags: post.tags.join('|'),
+    time: post.time,
+    likes: 0,
+    ts: post.ts,
+    vehicle: state.vehicle,
+  };
+  const r = await api.insertHive(row);
+  if (!r) showToast('Saved locally — cloud: ' + (api.lastError || 'failed'), 'error');
 }
 
 // ─── UTILS ───
