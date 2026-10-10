@@ -15,13 +15,18 @@
 </head>
 <body>
 
-<!-- Onboarding Gate -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- ONBOARDING GATE                                             -->
+<!-- ═══════════════════════════════════════════════════════════ -->
 <div id="onboardGate">
   <div class="onboard-logo">
     <img src="https://raw.githubusercontent.com/suryasticsai/Steeradar/main/steerardar-logo.png" alt="Steeradar"
       onerror="this.style.display='none';this.parentNode.innerHTML='<svg width=\'70\' height=\'70\' viewBox=\'0 0 32 32\' fill=\'none\'><circle cx=\'16\' cy=\'16\' r=\'13\' stroke=\'%230D9488\' stroke-width=\'2\'/><circle cx=\'16\' cy=\'16\' r=\'4\' fill=\'%230D9488\'/></svg>'">
   </div>
-  <h1 class="onboard-title"><span>Steer</span><span class="adar">adar</span><span class="dot">.</span></h1>
+
+  <h1 class="onboard-title">
+    <span>Steer</span><span class="adar">adar</span><span class="dot">.</span>
+  </h1>
   <p class="onboard-tagline">Live community rides. Enter your vehicle to unlock.</p>
 
   <div class="onboard-card">
@@ -38,7 +43,7 @@
       Format like <span class="example">KA01AB1234</span>
     </div>
     <button class="oc-btn" id="onboardBtn" disabled>
-      <span>Unlock Steeradar</span>
+      <span>Continue</span>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
     </button>
   </div>
@@ -53,7 +58,46 @@
   <p class="onboard-foot">Your vehicle number is stored locally and used as your Steeradar identity.</p>
 </div>
 
-<!-- Main App -->
+<!-- Onboarding Step 2: Photos -->
+<div id="onboardPhotos" style="display:none;flex-direction:column;align-items:center;padding:30px 24px;max-width:480px;margin:auto">
+  <h2 class="onboard-title">
+    <span>Almost</span><span class="adar">there</span><span class="dot">.</span>
+  </h2>
+  <p class="onboard-tagline">Add your documents. Only you can see your plate and QR.</p>
+
+  <div class="photo-grid">
+    <label class="photo-card" data-slot="avatar">
+      <input type="file" accept="image/*" capture="user" hidden>
+      <div class="photo-preview"><span class="photo-placeholder">📷</span></div>
+      <div class="photo-label">Your photo</div>
+    </label>
+
+    <label class="photo-card" data-slot="vehiclePhoto">
+      <input type="file" accept="image/*" capture="environment" hidden>
+      <div class="photo-preview"><span class="photo-placeholder">🚗</span></div>
+      <div class="photo-label">Vehicle photo</div>
+    </label>
+
+    <label class="photo-card" data-slot="platePhoto">
+      <input type="file" accept="image/*" capture="environment" hidden>
+      <div class="photo-preview"><span class="photo-placeholder">🔢</span></div>
+      <div class="photo-label">Number plate</div>
+    </label>
+
+    <label class="photo-card" data-slot="upiQr">
+      <input type="file" accept="image/*" hidden>
+      <div class="photo-preview"><span class="photo-placeholder">💳</span></div>
+      <div class="photo-label">UPI QR</div>
+    </label>
+  </div>
+
+  <button class="oc-btn" id="onboardPhotosDone" disabled style="max-width:400px;width:100%">Save &amp; unlock</button>
+  <button class="btn-secondary" id="onboardPhotosSkip" style="margin-top:8px;max-width:400px;width:100%">Skip for now</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- MAIN APP                                                    -->
+<!-- ═══════════════════════════════════════════════════════════ -->
 <div id="app">
   <header>
     <div class="logo">
@@ -74,12 +118,14 @@
   </header>
 
   <div class="content">
-    <!-- Pulse -->
+
+    <!-- ─── PULSE (Map) ─── -->
     <div id="pulseView" class="view active">
       <div id="map"></div>
       <button class="map-refresh" id="mapRefresh" title="Refresh map">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
       </button>
+
       <div class="pulse-overlay">
         <div class="location-pill" id="locationPill">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -87,16 +133,20 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.4"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
         <div class="filter-row">
-          <button class="chip active" data-filter="live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Live now</button>
+          <button class="chip active" data-filter="live">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Live now
+          </button>
           <button class="chip" data-filter="all">All</button>
           <button class="chip" data-filter="seats">Has seats</button>
           <button class="chip" data-filter="mine">My lanes</button>
         </div>
       </div>
+
       <div class="map-lane-card" id="mapLaneCard"></div>
     </div>
 
-    <!-- Lanes -->
+    <!-- ─── LANES ─── -->
     <div id="lanesView" class="view">
       <div class="view-header">
         <span class="right-pill" id="connBadge"><span class="live-dot"></span> Connecting</span>
@@ -106,7 +156,7 @@
       <div class="lane-list" id="laneList"></div>
     </div>
 
-    <!-- Near -->
+    <!-- ─── NEAR ─── -->
     <div id="nearView" class="view">
       <div class="view-header">
         <h2>Near</h2>
@@ -122,7 +172,10 @@
           </div>
         </div>
         <div class="lrb-stats">
-          <div class="lrb-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg><span id="localPeerCount">0 peers</span></div>
+          <div class="lrb-stat">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg>
+            <span id="localPeerCount">0 peers</span>
+          </div>
         </div>
         <div class="lrb-room">Room: <span id="localRoomId">—</span></div>
       </div>
@@ -145,7 +198,7 @@
       <div id="roomList"></div>
     </div>
 
-    <!-- Hive -->
+    <!-- ─── HIVE ─── -->
     <div id="hiveView" class="view">
       <div class="hive-header">
         <h1>Hive</h1>
@@ -160,155 +213,292 @@
       <div class="section-label">Local posts <span class="see-all" id="hiveCount"></span></div>
       <div id="hiveFeed"></div>
     </div>
+
   </div>
 
+  <!-- ─── FAB ─── -->
   <button class="fab" id="fabBtn">
     <span class="fab-icon">+</span>
     <span class="fab-text">
       <span id="fabLabel">Post my lane</span>
-      <span class="fab-sub" id="fabSub">Share seats & route</span>
+      <span class="fab-sub" id="fabSub">Share seats &amp; route</span>
     </span>
   </button>
 
+  <!-- ─── Bottom Nav ─── -->
   <nav class="bottom-nav">
-    <button class="nav-item active" data-tab="pulse"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Pulse</button>
-    <button class="nav-item" data-tab="lanes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 12h18M8 6V4M16 6V4"/><circle cx="8" cy="16" r="1.2" fill="currentColor"/><circle cx="16" cy="16" r="1.2" fill="currentColor"/></svg>Lanes</button>
-    <button class="nav-item" data-tab="near"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><path d="M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" opacity="0.5"/></svg>Near</button>
-    <button class="nav-item" data-tab="hive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 3v9M12 12l8 4.5M12 12l-8 4.5"/></svg>Hive</button>
+    <button class="nav-item active" data-tab="pulse">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Pulse
+    </button>
+    <button class="nav-item" data-tab="lanes">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 12h18M8 6V4M16 6V4"/><circle cx="8" cy="16" r="1.2" fill="currentColor"/><circle cx="16" cy="16" r="1.2" fill="currentColor"/></svg>
+      Lanes
+    </button>
+    <button class="nav-item" data-tab="near">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><path d="M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" opacity="0.5"/></svg>
+      Near
+    </button>
+    <button class="nav-item" data-tab="hive">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 3v9M12 12l8 4.5M12 12l-8 4.5"/></svg>
+      Hive
+    </button>
   </nav>
 </div>
 
-<!-- Post Lane Modal -->
-<div class="modal-overlay" id="postModal"><div class="modal">
-  <div class="modal-head">
-    <h3>Post your lane</h3>
-    <button class="modal-close" data-close="#postModal">✕</button>
-  </div>
-  <label>Destination</label><input type="text" id="pDest" placeholder="e.g. Downtown Central">
-  <label>Route stops (comma separated)</label><input type="text" id="pRoute" placeholder="Maple, Oak, Center St">
-  <label>Seats available</label>
-  <div class="seat-selector" id="seatSelector">
-    <button class="seat-btn" data-seats="4"><span class="num">4</span><span class="lbl">Seats</span></button>
-    <button class="seat-btn" data-seats="3"><span class="num">3</span><span class="lbl">Seats</span></button>
-    <button class="seat-btn" data-seats="2"><span class="num">2</span><span class="lbl">Seats</span></button>
-    <button class="seat-btn" data-seats="1"><span class="num">1</span><span class="lbl">Seat</span></button>
-    <button class="seat-btn" data-seats="0"><span class="num">0</span><span class="lbl">Full</span></button>
-  </div>
-  <label>Fare (₹)</label><input type="number" id="pFare" placeholder="20" value="20" min="0">
-  <button class="btn-primary" id="postConfirm">Go live</button>
-</div></div>
-
-<!-- Request Modal -->
-<div class="modal-overlay" id="requestModal"><div class="modal">
-  <div class="modal-head">
-    <h3>Request a seat</h3>
-    <button class="modal-close" data-close="#requestModal">✕</button>
-  </div>
-  <p id="reqInfo" style="color:var(--text-2);font-size:.85rem;margin-bottom:16px"></p>
-  <label>Your message (optional)</label>
-  <textarea id="reqMsg" placeholder="Hi! I'm at the Main Gate, can you wait 2 minutes?"></textarea>
-  <button class="btn-primary" id="reqConfirm">Send request</button>
-</div></div>
-
-<!-- Chat Modal -->
-<div class="modal-overlay" id="chatModal"><div class="modal" style="height:82vh;display:flex;flex-direction:column">
-  <div class="chat-header">
-    <div class="ch-avatar" id="chatAvatar">?</div>
-    <div class="ch-info">
-      <div class="ch-name" id="chatName">Lane chat</div>
-      <div class="ch-status" id="chatStatusWrap"><span class="live-dot"></span><span id="chatStatus">Connecting…</span></div>
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- LIVE TRACKING HUD                                           -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="track-hud" id="trackHud">
+  <div class="track-row-1">
+    <div class="track-avatar" id="trackAvatar">?</div>
+    <div class="track-info">
+      <div class="track-name" id="trackName">—</div>
+      <div class="track-meta" id="trackMeta">—</div>
     </div>
-    <button class="modal-close" data-close="#chatModal">✕</button>
+    <button class="track-close" id="trackClose">✕</button>
   </div>
-  <div class="chat-messages" id="chatMessages"></div>
-  <div class="chat-input-row">
-    <input type="text" id="chatInput" placeholder="Type a message…" autocomplete="off">
-    <button class="send-btn" id="chatSend">➤</button>
-  </div>
-</div></div>
-
-<!-- Settings Modal -->
-<div class="modal-overlay" id="settingsModal"><div class="modal" style="max-height:90vh">
-  <div class="modal-head">
-    <h3>Settings</h3>
-    <button class="modal-close" data-close="#settingsModal">✕</button>
-  </div>
-
-  <div class="settings-section">
-    <div class="settings-label">Profile</div>
-    <input type="text" id="setName" placeholder="Your display name">
-    <div class="vehicle-input-wrap" style="margin-top:8px">
-      <input type="text" id="setVehicle" placeholder="Vehicle number" maxlength="15" autocapitalize="characters">
+  <div class="track-row-2">
+    <div class="track-stat">
+      <div class="track-stat-val" id="trackDist">—</div>
+      <div class="track-stat-lbl">Away</div>
+    </div>
+    <div class="track-stat">
+      <div class="track-stat-val" id="trackEta">—</div>
+      <div class="track-stat-lbl">ETA</div>
+    </div>
+    <div class="track-stat">
+      <div class="track-stat-val" id="trackSeats">—</div>
+      <div class="track-stat-lbl">Seats</div>
     </div>
   </div>
+  <button class="track-chat" id="trackChat">💬 Message driver</button>
+</div>
 
-  <div class="settings-section">
-    <div class="settings-label">Appearance</div>
-    <div class="settings-row">
-      <span>Theme</span>
-      <div class="segmented" id="setTheme">
-        <button data-value="light" class="active">Light</button>
-        <button data-value="dark">Dark</button>
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- POST LANE MODAL                                             -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="postModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Post your lane</h3>
+      <button class="modal-close" data-close="#postModal">✕</button>
+    </div>
+
+    <label>What are you driving?</label>
+    <div class="vehicle-type-grid" id="vehicleTypeGrid"></div>
+
+    <label>Destination</label>
+    <input type="text" id="pDest" placeholder="e.g. Downtown Central">
+
+    <label>Route stops (comma separated)</label>
+    <input type="text" id="pRoute" placeholder="Maple, Oak, Center St">
+
+    <label>Seats available</label>
+    <div class="seat-selector" id="seatSelector">
+      <button class="seat-btn" data-seats="40"><span class="num">40</span><span class="lbl">Bus</span></button>
+      <button class="seat-btn" data-seats="4"><span class="num">4</span><span class="lbl">Car</span></button>
+      <button class="seat-btn" data-seats="3"><span class="num">3</span><span class="lbl">Auto</span></button>
+      <button class="seat-btn" data-seats="2"><span class="num">2</span><span class="lbl">Shared</span></button>
+      <button class="seat-btn" data-seats="1"><span class="num">1</span><span class="lbl">Single</span></button>
+      <button class="seat-btn" data-seats="0"><span class="num">0</span><span class="lbl">Full</span></button>
+    </div>
+
+    <label>Fare (₹)</label>
+    <input type="number" id="pFare" placeholder="20" value="20" min="0">
+
+    <button class="btn-primary" id="postConfirm">Go live</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- REQUEST SEAT MODAL                                          -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="requestModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Request a seat</h3>
+      <button class="modal-close" data-close="#requestModal">✕</button>
+    </div>
+    <p id="reqInfo" style="color:var(--text-2);font-size:.85rem;margin-bottom:16px"></p>
+    <label>Your message (optional)</label>
+    <textarea id="reqMsg" placeholder="Hi! I'm at the Main Gate, can you wait 2 minutes?"></textarea>
+    <button class="btn-primary" id="reqConfirm">Send request</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- CHAT MODAL                                                  -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="chatModal">
+  <div class="modal" style="height:82vh;display:flex;flex-direction:column">
+    <div class="chat-header">
+      <div class="ch-avatar" id="chatAvatar">?</div>
+      <div class="ch-info">
+        <div class="ch-name" id="chatName">Lane chat</div>
+        <div class="ch-status" id="chatStatusWrap"><span class="live-dot"></span><span id="chatStatus">Connecting…</span></div>
+      </div>
+      <button class="modal-close" data-close="#chatModal">✕</button>
+    </div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-input-row">
+      <input type="text" id="chatInput" placeholder="Type a message…" autocomplete="off">
+      <button class="send-btn" id="chatSend">➤</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SETTINGS MODAL                                              -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal" style="max-height:90vh">
+    <div class="modal-head">
+      <h3>Settings</h3>
+      <button class="modal-close" data-close="#settingsModal">✕</button>
+    </div>
+
+    <!-- Account -->
+    <div class="settings-section">
+      <div class="settings-label">Account</div>
+      <div class="settings-row">
+        <span>Sign in with OTP</span>
+        <button class="btn-sm-danger" id="authOpenBtn" style="background:var(--teal);color:#fff;border-color:var(--teal)">Sign in</button>
+      </div>
+      <div class="settings-row">
+        <span>Sign out</span>
+        <button class="btn-sm-danger" id="authLogoutBtn">Sign out</button>
       </div>
     </div>
-    <div class="settings-row">
-      <span>Map style</span>
-      <div class="segmented" id="setMapStyle">
-        <button data-value="bright" class="active">Bright</button>
-        <button data-value="dark">Dark</button>
+
+    <!-- Profile -->
+    <div class="settings-section">
+      <div class="settings-label">Profile</div>
+      <input type="text" id="setName" placeholder="Your display name">
+      <div class="vehicle-input-wrap" style="margin-top:8px">
+        <input type="text" id="setVehicle" placeholder="Vehicle number" maxlength="15" autocapitalize="characters">
       </div>
     </div>
+
+    <!-- Appearance -->
+    <div class="settings-section">
+      <div class="settings-label">Appearance</div>
+      <div class="settings-row">
+        <span>Theme</span>
+        <div class="segmented" id="setTheme">
+          <button data-value="light" class="active">Light</button>
+          <button data-value="dark">Dark</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <span>Map style</span>
+        <div class="segmented" id="setMapStyle">
+          <button data-value="bright" class="active">Bright</button>
+          <button data-value="dark">Dark</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notifications -->
+    <div class="settings-section">
+      <div class="settings-label">Notifications</div>
+      <div class="settings-row"><span>Chat messages</span><label class="switch"><input type="checkbox" id="setNotifChat" checked><span></span></label></div>
+      <div class="settings-row"><span>Seat requests</span><label class="switch"><input type="checkbox" id="setNotifSeats" checked><span></span></label></div>
+    </div>
+
+    <!-- Privacy -->
+    <div class="settings-section">
+      <div class="settings-label">Privacy</div>
+      <div class="settings-row"><span>Share exact GPS with peers</span><label class="switch"><input type="checkbox" id="setShareGps" checked><span></span></label></div>
+      <div class="settings-row"><span>Visible in local mesh</span><label class="switch"><input type="checkbox" id="setVisible" checked><span></span></label></div>
+      <div class="settings-row"><span>Ghost mode (hide from map)</span><label class="switch"><input type="checkbox" id="setGhost"><span></span></label></div>
+      <div class="settings-row"><span>Show my plate to other drivers</span><label class="switch"><input type="checkbox" id="setShowPlate" checked><span></span></label></div>
+      <div class="settings-row"><span>Share UPI QR for payments</span><label class="switch"><input type="checkbox" id="setShareUpi" checked><span></span></label></div>
+    </div>
+
+    <!-- Universal DB -->
+    <div class="settings-section">
+      <div class="settings-label">Universal DB</div>
+      <div class="settings-row"><span>Cloud sync</span><label class="switch"><input type="checkbox" id="setCloudSync"><span></span></label></div>
+      <div class="cloud-status" id="cloudStatus">Not connected</div>
+      <input type="text" id="setCloudUrl" placeholder="Apps Script URL" style="margin-top:8px">
+      <input type="text" id="setCloudKey" placeholder="Secret key" style="margin-top:8px">
+      <button class="btn-secondary" id="cloudTest" style="margin-top:8px">Test connection</button>
+    </div>
+
+    <!-- Data -->
+    <div class="settings-section">
+      <div class="settings-label">Data</div>
+      <div class="settings-row"><span>Clear my published lanes</span><button class="btn-sm-danger" id="setClearLanes">Clear</button></div>
+      <div class="settings-row"><span>Reset all data</span><button class="btn-sm-danger" id="setResetAll">Reset</button></div>
+    </div>
+
+    <!-- About -->
+    <div class="settings-section">
+      <div class="settings-label">About</div>
+      <p style="font-size:0.78rem;color:var(--text-2);line-height:1.6">
+        Steeradar v6 · Vanilla JS · MIT License<br>
+        Made by <a href="https://github.com/suryasticsai" target="_blank">@suryasticsai</a>
+      </p>
+    </div>
+
+    <button class="btn-primary" id="settingsSave">Save &amp; close</button>
   </div>
+</div>
 
-  <div class="settings-section">
-    <div class="settings-label">Notifications</div>
-    <div class="settings-row"><span>Chat messages</span><label class="switch"><input type="checkbox" id="setNotifChat" checked><span></span></label></div>
-    <div class="settings-row"><span>Seat requests</span><label class="switch"><input type="checkbox" id="setNotifSeats" checked><span></span></label></div>
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- POST DETAIL MODAL                                           -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="postDetailModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 style="opacity:0;height:0;margin:0">Post</h3>
+      <button class="modal-close" data-close="#postDetailModal">✕</button>
+    </div>
+    <div class="post-detail" id="postDetailContent"></div>
   </div>
+</div>
 
-  <div class="settings-section">
-    <div class="settings-label">Privacy</div>
-    <div class="settings-row"><span>Share exact GPS with peers</span><label class="switch"><input type="checkbox" id="setShareGps" checked><span></span></label></div>
-    <div class="settings-row"><span>Visible in local mesh</span><label class="switch"><input type="checkbox" id="setVisible" checked><span></span></label></div>
-    <div class="settings-row"><span>Ghost mode (hide from map)</span><label class="switch"><input type="checkbox" id="setGhost"><span></span></label></div>
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- AUTH MODAL (OTP)                                            -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="authModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="authTitle">Create your account</h3>
+      <button class="modal-close" id="authClose">✕</button>
+    </div>
+
+    <!-- Step 1: phone + email -->
+    <div id="authStep1">
+      <label>Phone number</label>
+      <input type="tel" id="authPhone" placeholder="10-digit mobile" maxlength="10" inputmode="numeric" autocomplete="tel-national">
+      <label>Email</label>
+      <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email">
+      <button class="btn-primary" id="authSendOtp" style="margin-top:8px">Send code</button>
+    </div>
+
+    <!-- Step 2: OTP code -->
+    <div id="authStep2" style="display:none">
+      <label>Verification code</label>
+      <input type="text" id="authCode" placeholder="6-digit code" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+      <button class="btn-primary" id="authVerifyOtp" style="margin-top:8px">Verify</button>
+    </div>
+
+    <!-- Step 3: register details -->
+    <div id="authStep3" style="display:none">
+      <label>Your name</label>
+      <input type="text" id="authName" placeholder="e.g. Sai Varakala" autocomplete="name">
+      <label>Username</label>
+      <input type="text" id="authUsername" placeholder="e.g. sai_varakala" autocapitalize="none" autocomplete="username">
+      <button class="btn-primary" id="authConfirm" style="margin-top:8px">Create account</button>
+    </div>
   </div>
+</div>
 
-  <div class="settings-section">
-    <div class="settings-label">Universal DB</div>
-    <div class="settings-row"><span>Cloud sync</span><label class="switch"><input type="checkbox" id="setCloudSync"><span></span></label></div>
-    <div class="cloud-status" id="cloudStatus">Not connected</div>
-    <input type="text" id="setCloudUrl" placeholder="Apps Script URL" style="margin-top:8px">
-    <input type="text" id="setCloudKey" placeholder="Secret key" style="margin-top:8px">
-    <button class="btn-secondary" id="cloudTest" style="margin-top:8px">Test connection</button>
-  </div>
-
-  <div class="settings-section">
-    <div class="settings-label">Data</div>
-    <div class="settings-row"><span>Clear my published lanes</span><button class="btn-sm-danger" id="setClearLanes">Clear</button></div>
-    <div class="settings-row"><span>Reset all data</span><button class="btn-sm-danger" id="setResetAll">Reset</button></div>
-  </div>
-
-  <div class="settings-section">
-    <div class="settings-label">About</div>
-    <p style="font-size:0.78rem;color:var(--text-2);line-height:1.6">
-      Steeradar v3 · Vanilla JS · MIT License<br>
-      Made by <a href="https://github.com/suryasticsai" target="_blank">@suryasticsai</a>
-    </p>
-  </div>
-
-  <button class="btn-primary" id="settingsSave">Save & close</button>
-</div></div>
-
-<!-- Post Detail Modal -->
-<div class="modal-overlay" id="postDetailModal"><div class="modal">
-  <div class="modal-head">
-    <h3 style="opacity:0;height:0;margin:0">Post</h3>
-    <button class="modal-close" data-close="#postDetailModal">✕</button>
-  </div>
-  <div class="post-detail" id="postDetailContent"></div>
-</div></div>
-
-<!-- Custom Dialog -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- CUSTOM DIALOG (replaces alert/confirm/prompt)               -->
+<!-- ═══════════════════════════════════════════════════════════ -->
 <div class="dialog-overlay" id="dialogOverlay">
   <div class="dialog">
     <h3 id="dialogTitle">Confirm</h3>
@@ -321,16 +511,44 @@
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- TOAST                                                       -->
+<!-- ═══════════════════════════════════════════════════════════ -->
 <div class="toast" id="toast"></div>
 
-<!-- CDN libraries -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- CDN LIBRARIES                                               -->
+<!-- ═══════════════════════════════════════════════════════════ -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.22/leaflet-maplibre-gl.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
-<!-- App config (MUST load before app.js) -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- APP CONFIG + MODULES                                        -->
+<!-- ═══════════════════════════════════════════════════════════ -->
 <script src="./config.js"></script>
+
+<!-- Legacy app — replaced once modules are wired -->
 <script src="./app.js"></script>
+
+<!-- Expose module loaders for gradual migration -->
+<script type="module">
+  // Once js/app.js is ready, the two lines above will be replaced by:
+  //   <script type="module" src="./js/app.js"></script>
+  // Until then, we just expose the modular pieces to the legacy app.
+  import { api } from './js/api.js';
+  import { state, storage, session, showToast } from './js/store.js';
+  import { setupPhotoUploads } from './js/photos.js';
+  import { initOnboarding, getPhotos, resetOnboarding } from './js/onboarding.js';
+  import { initAuth, openAuthSheet, logout, validateSessionOnBoot } from './js/auth.js';
+
+  window.Steeradar = {
+    api, state, storage, session, showToast,
+    setupPhotoUploads, initOnboarding, getPhotos, resetOnboarding,
+    initAuth, openAuthSheet, logout, validateSessionOnBoot,
+  };
+</script>
+
 </body>
 </html>
