@@ -100,7 +100,7 @@
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div id="app">
   <header>
-    <div class="logo">
+    <div class="logo" id="logoTrigger" title="Long-press for diagnostics">
       <img class="logo-img" src="https://raw.githubusercontent.com/suryasticsai/Steeradar/main/steerardar-logo.png" alt="Steeradar"
         onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<svg width=\'32\' height=\'32\' viewBox=\'0 0 32 32\' fill=\'none\'><circle cx=\'16\' cy=\'16\' r=\'13\' stroke=\'%230D9488\' stroke-width=\'2\'/><circle cx=\'16\' cy=\'16\' r=\'4\' fill=\'%230D9488\'/></svg>')">
       <div class="logo-text"><span>Steer</span><span class="adar">adar</span><span class="dot">.</span></div>
@@ -312,6 +312,43 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
+<!-- EDIT LANE MODAL                                             -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="editLaneModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Edit lane</h3>
+      <button class="modal-close" data-close="#editLaneModal">✕</button>
+    </div>
+
+    <label>Destination</label>
+    <input type="text" id="elDest" placeholder="e.g. Downtown Central">
+
+    <label>Route stops (comma separated)</label>
+    <input type="text" id="elRoute" placeholder="Maple, Oak, Center St">
+
+    <label>Seats still available</label>
+    <div class="seat-selector" id="elSeatSelector">
+      <button class="seat-btn" data-seats="40"><span class="num">40</span><span class="lbl">Bus</span></button>
+      <button class="seat-btn" data-seats="4"><span class="num">4</span><span class="lbl">Car</span></button>
+      <button class="seat-btn" data-seats="3"><span class="num">3</span><span class="lbl">Auto</span></button>
+      <button class="seat-btn" data-seats="2"><span class="num">2</span><span class="lbl">Shared</span></button>
+      <button class="seat-btn" data-seats="1"><span class="num">1</span><span class="lbl">Single</span></button>
+      <button class="seat-btn" data-seats="0"><span class="num">0</span><span class="lbl">Full</span></button>
+    </div>
+
+    <label>Fare (₹)</label>
+    <input type="number" id="elFare" placeholder="20" min="0">
+
+    <button class="btn-primary" id="editLaneConfirm">Save changes</button>
+    <button class="btn-danger-outline" id="editLaneDelete"
+      style="margin-top:8px;width:100%;padding:14px;border-radius:12px;background:var(--coral-dim);color:var(--coral);border:1px solid var(--coral);font-weight:700">
+      Delete this lane
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
 <!-- REQUEST SEAT MODAL                                          -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div class="modal-overlay" id="requestModal">
@@ -443,11 +480,20 @@
     <!-- Universal DB -->
     <div class="settings-section">
       <div class="settings-label">Universal DB</div>
-      <div class="settings-row"><span>Cloud sync</span><label class="switch"><input type="checkbox" id="setCloudSync"><span></span></label></div>
+      <div class="settings-row">
+        <span>Cloud sync</span>
+        <label class="switch"><input type="checkbox" id="setCloudSync"><span></span></label>
+      </div>
       <div class="cloud-status" id="cloudStatus">Not connected</div>
-      <input type="text" id="setCloudUrl" placeholder="Apps Script URL" style="margin-top:8px">
-      <input type="text" id="setCloudKey" placeholder="Secret key" style="margin-top:8px">
       <button class="btn-secondary" id="cloudTest" style="margin-top:8px">Test connection</button>
+
+      <!-- Hidden until developer mode is enabled -->
+      <div id="devModeBlock" style="display:none;margin-top:16px">
+        <div class="settings-label" style="margin-top:8px">Developer · cloud endpoint</div>
+        <input type="text" id="setCloudUrl" placeholder="Apps Script URL">
+        <input type="text" id="setCloudKey" placeholder="Secret key">
+        <button class="btn-secondary" id="cloudSaveDev" style="margin-top:8px">Save endpoint</button>
+      </div>
     </div>
 
     <!-- Data -->
@@ -463,6 +509,9 @@
       <p style="font-size:0.78rem;color:var(--text-2);line-height:1.6">
         Steeradar v6 · Vanilla JS · MIT License<br>
         Made by <a href="https://github.com/suryasticsai" target="_blank">@suryasticsai</a>
+      </p>
+      <p id="versionTap" style="font-size:0.7rem;color:var(--text-3);margin-top:8px;user-select:none;cursor:pointer">
+        v6.0 — <span id="devModeHint">tap 5 times for diagnostics</span>
       </p>
     </div>
 
@@ -521,6 +570,28 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
+<!-- LOG VIEWER MODAL — hidden by default, opened by long-press  -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="logModal">
+  <div class="modal" style="height:85vh;display:flex;flex-direction:column">
+    <div class="modal-head">
+      <h3>Diagnostics log</h3>
+      <button class="modal-close" data-close="#logModal">✕</button>
+    </div>
+
+    <div class="log-actions">
+      <button class="btn-secondary" id="logCopy" style="flex:1">📋 Copy</button>
+      <button class="btn-secondary" id="logClear" style="flex:1">🗑 Clear</button>
+      <button class="btn-secondary" id="logRefresh" style="flex:1">↻ Refresh</button>
+    </div>
+
+    <div class="log-content" id="logContent">
+      <div class="log-empty">No logs yet.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
 <!-- CUSTOM DIALOG (replaces alert/confirm/prompt)               -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div class="dialog-overlay" id="dialogOverlay">
@@ -554,7 +625,7 @@
 <script src="./config.js"></script>
 <script type="module" src="./js/app.js"></script>
 
-<!-- Debug bridge (optional — safe to remove later) -->
+<!-- Debug bridge -->
 <script type="module">
   import { api } from './js/api.js';
   import { state, storage, session, showToast } from './js/store.js';
@@ -563,11 +634,12 @@
   import { chat } from './js/chat.js';
   import { hive } from './js/hive.js';
   import { presence } from './js/presence.js';
+  import { logger } from './js/logger.js';
 
   window.Steeradar = {
     api, state, storage, session, showToast,
     setupPhotoUploads,
-    lanes, chat, hive, presence,
+    lanes, chat, hive, presence, logger,
     broadcastToAllPeers: presence.broadcast,
     startRouteTracking: presence.startTracking,
     openChatForLane: chat.openLane,
