@@ -1,6 +1,4 @@
-// js/lanes.js — Post lanes, view feed, map markers, request seats, track.
-// Depends on: api.js, store.js, photos.js
-// Calls into: chat.js (openChat), presence.js (startRouteTracking)
+// js/lanes.js — Post lanes, view feed, map markers, request seats, edit, track.
 
 import { api } from './api.js';
 import {
@@ -12,9 +10,10 @@ import {
 
 const CFG = window.STEERADAR || {};
 
-// ─── STATE ───
 let pendingSeats = null;
 let requestTarget = null;
+let _editTarget = null;
+let _editSeats = null;
 
 // ─── PUBLIC: BOOT ───
 export function initLanes() {
@@ -32,7 +31,6 @@ export function loadLanesFromStorage() {
 }
 
 export async function syncLanesFromCloud() {
-  if (!CFG.CLOUD_SYNC_DEFAULT && !storage.get('cloud-enabled', false)) return;
   const list = await api.listLanes();
   if (!Array.isArray(list)) { state.cloudOnline = false; return; }
   state.cloudOnline = true;
@@ -42,7 +40,7 @@ export async function syncLanesFromCloud() {
 
   list.forEach(l => {
     const ts = Number(l.ts) || 0;
-    if (Date.now() - ts > 24 * 3600 * 1000) return; // ignore stale (>24h)
+    if (Date.now() - ts > 24 * 3600 * 1000) return;
 
     const lane = {
       id: String(l.id),
@@ -90,10 +88,8 @@ export function renderVehicleTypeGrid() {
   grid.querySelectorAll('.vehicle-type-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       state.selectedVehicleType = btn.dataset.vtype;
-      grid.querySelectorAll('.vehicle-type-btn').forEach(b =>
-        b.classList.toggle('active', b === btn));
+      grid.querySelectorAll('.vehicle-type-btn').forEach(b => b.classList.toggle('active', b === btn));
 
-      // Auto-select suggested seat count
       const vt = getVehicleType(state.selectedVehicleType);
       const suggest = Math.min(vt.seats, 10);
       document.querySelectorAll('#seatSelector .seat-btn').forEach(b => {
@@ -152,6 +148,7 @@ export function renderLanes() {
 
     return `
       <div class="lane-card ${lane.mine ? 'mine' : ''}" data-id="${lane.id}">
+        ${lane.mine ? '<button class="edit-lane-btn" data-edit="' + lane.id + '" title="Edit">✎</button>' : ''}
         <div class="status-tag ${full ? 'delayed' : ''}">
           <span class="live-dot"></span>${full ? 'FULL' : 'LIVE · ON TIME'}
           ${lane.mine ? '<span class="you-tag">YOU</span>' : ''}
@@ -214,6 +211,14 @@ export function renderLanes() {
       if (action === 'chat')    openChatForLane(lane);
       if (action === 'request') openRequest(lane);
       if (action === 'track')   startTrackingLane(lane);
+    });
+  });
+
+  list.querySelectorAll('[data-edit]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const lane = state.lanes.find(l => l.id === btn.dataset.edit);
+      if (lane) openEditLane(lane);
     });
   });
 }
@@ -294,27 +299,21 @@ export function hideLaneCard() {
 function wirePostModal() {
   document.querySelectorAll('#seatSelector .seat-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('#seatSelector .seat-btn').forEach(b =>
-        b.classList.toggle('active', b === btn));
+      document.querySelectorAll('#seatSelector .seat-btn').forEach(b => b.classList.toggle('active', b === btn));
       pendingSeats = parseInt(btn.dataset.seats, 10);
     });
   });
-
   document.getElementById('postConfirm').onclick = handlePostConfirm;
 }
 
 export function openPostModal() {
-  // Reset form
   document.getElementById('pDest').value = '';
   document.getElementById('pRoute').value = '';
   document.getElementById('pFare').value = '20';
   pendingSeats = null;
   document.querySelectorAll('#seatSelector .seat-btn').forEach(b => b.classList.remove('active'));
-
-  // Default vehicle type
   state.selectedVehicleType = 'bus';
   renderVehicleTypeGrid();
-
   document.getElementById('postModal').classList.add('active');
 }
 
@@ -332,7 +331,6 @@ async function handlePostConfirm() {
   const total = vt.seats || 10;
   const taken = Math.max(0, total - pendingSeats);
 
-  // Ensure we have GPS first
   const coords = await getCurrentCoords();
 
   const lane = {
@@ -354,11 +352,8 @@ async function handlePostConfirm() {
     ts: Date.now(),
   };
 
-  // Remove previous "mine" lanes with same destination
   const oldMine = state.lanes.filter(l => l.mine && l.route.to === dest);
-  for (const old of oldMine) {
-    if (api) { try { await api.removeLane(old.id); } catch {} }
-  }
+  for (const old of oldMine) { try { await api.removeLane(old.id); } catch {} }
   state.lanes = state.lanes.filter(l => !(l.mine && l.route.to === dest));
   state.lanes.unshift(lane);
   saveLanes();
@@ -369,18 +364,15 @@ async function handlePostConfirm() {
   document.querySelector('[data-tab="lanes"]').click();
   showToast('Lane is live! 🚌', 'success');
 
-  // Push to cloud
-  if (state.cloudOnline) {
-    const row = {
-      id: lane.id, driver: lane.driver, phone: lane.phone,
-      vehicle: lane.vehicle, vehicleType: lane.vehicleType,
-      from: lane.route.from, via: lane.route.via.join('|'), to: lane.route.to,
-      total, taken, fare: lane.fare, lat: lane.lat, lng: lane.lng,
-      status: 'live', ts: lane.ts, peerId: state.peerId, lastSeen: Date.now(),
-    };
-    const r = await api.insertLane(row);
-    if (!r) showToast('Saved locally — cloud: ' + (api.lastError || 'failed'), 'error');
-  }
+  const row = {
+    id: lane.id, driver: lane.driver, phone: lane.phone,
+    vehicle: lane.vehicle, vehicleType: lane.vehicleType,
+    from: lane.route.from, via: lane.route.via.join('|'), to: lane.route.to,
+    total, taken, fare: lane.fare, lat: lane.lat, lng: lane.lng,
+    status: 'live', ts: lane.ts, peerId: state.peerId, lastSeen: Date.now(),
+  };
+  const r = await api.insertLane(row);
+  if (!r) showToast('Saved locally — cloud: ' + (api.lastError || 'failed'), 'error');
 }
 
 async function getCurrentCoords() {
@@ -395,6 +387,105 @@ async function getCurrentCoords() {
       { timeout: 5000 }
     );
   });
+}
+
+// ─── EDIT LANE ───
+export function initEditLane() {
+  const overlay = document.getElementById('editLaneModal');
+  if (!overlay) return;
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.classList.remove('active');
+  });
+
+  document.querySelectorAll('#elSeatSelector .seat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#elSeatSelector .seat-btn').forEach(b => b.classList.toggle('active', b === btn));
+      _editSeats = parseInt(btn.dataset.seats, 10);
+    });
+  });
+
+  document.getElementById('editLaneConfirm').onclick = saveEditedLane;
+  document.getElementById('editLaneDelete').onclick  = deleteEditedLane;
+}
+
+export function openEditLane(lane) {
+  if (!lane || !lane.mine) { showToast('You can only edit your own lanes'); return; }
+  _editTarget = lane;
+
+  const left = lane.seats.total - lane.seats.taken;
+  const via = (lane.route.via || []).join(', ');
+
+  document.getElementById('elDest').value = lane.route.to || '';
+  document.getElementById('elRoute').value = (lane.route.from ? lane.route.from + ', ' : '') + via;
+  document.getElementById('elFare').value = lane.fare || 0;
+
+  _editSeats = null;
+  document.querySelectorAll('#elSeatSelector .seat-btn').forEach(b => {
+    const s = parseInt(b.dataset.seats, 10);
+    const active = s === left || (s === 40 && left > 10);
+    b.classList.toggle('active', active);
+    if (active) _editSeats = s;
+  });
+
+  document.getElementById('editLaneModal').classList.add('active');
+}
+
+async function saveEditedLane() {
+  if (!_editTarget) return;
+
+  const dest = document.getElementById('elDest').value.trim();
+  const routeStr = document.getElementById('elRoute').value.trim();
+  const fare = parseInt(document.getElementById('elFare').value, 10) || 0;
+
+  if (!dest) { showToast('Destination required', 'error'); return; }
+
+  const via = routeStr.split(',').map(s => s.trim()).filter(Boolean);
+  const from = via.shift() || _editTarget.route.from || 'Your location';
+  const total = _editTarget.seats.total;
+  const taken = _editSeats != null ? Math.max(0, total - _editSeats) : _editTarget.seats.taken;
+
+  _editTarget.route = { from, via: via.length ? via : ['Via Main'], to: dest };
+  _editTarget.seats.taken = taken;
+  _editTarget.fare = fare;
+  saveLanes();
+
+  renderLanes();
+  renderBusMarkers();
+  document.getElementById('editLaneModal').classList.remove('active');
+  showToast('Lane updated', 'success');
+
+  if (_editTarget.id.startsWith('mine-')) {
+    const row = {
+      id: _editTarget.id, driver: _editTarget.driver,
+      vehicle: _editTarget.vehicle, vehicleType: _editTarget.vehicleType,
+      from, via: via.join('|'), to: dest,
+      total, taken, fare, lat: _editTarget.lat, lng: _editTarget.lng,
+      status: 'live', ts: _editTarget.ts, peerId: state.peerId, lastSeen: Date.now(),
+    };
+    const r = await api.updateLane(_editTarget.id, row);
+    if (!r) showToast('Saved locally · cloud: ' + (api.lastError || 'failed'), 'error');
+  }
+
+  _editTarget = null;
+  _editSeats = null;
+}
+
+async function deleteEditedLane() {
+  if (!_editTarget) return;
+  if (!confirm('Delete this lane?')) return;
+  const id = _editTarget.id;
+
+  try { await api.removeLane(id); } catch {}
+  state.lanes = state.lanes.filter(l => l.id !== id);
+  saveLanes();
+  renderLanes();
+  renderBusMarkers();
+  document.getElementById('editLaneModal').classList.remove('active');
+  showToast('Lane deleted', 'success');
+
+  _editTarget = null;
+  _editSeats = null;
 }
 
 // ─── REQUEST MODAL ───
@@ -422,11 +513,7 @@ async function handleRequestConfirm() {
     try {
       const conn = state.peer.connect(pid, { reliable: true });
       conn.on('open', () => {
-        conn.send({
-          type: 'chat',
-          text: '👋 Seat request: ' + (msg || 'Can I join?'),
-          sender: state.userName,
-        });
+        conn.send({ type: 'chat', text: '👋 Seat request: ' + (msg || 'Can I join?'), sender: state.userName });
         setTimeout(() => { try { conn.close(); } catch {} }, 500);
       });
       conn.on('error', () => {});
@@ -438,31 +525,24 @@ async function handleRequestConfirm() {
   requestTarget = null;
 }
 
-// ─── HOOKS INTO OTHER MODULES ───
-// These use the window.Steeradar bridge if chat.js/presence.js are loaded.
+// ─── HOOKS ───
 function openChatForLane(lane) {
-  if (window.Steeradar?.openChatForLane) {
-    window.Steeradar.openChatForLane(lane);
-  } else {
-    showToast('Chat module not loaded');
-  }
+  if (window.Steeradar?.chat) window.Steeradar.chat.openLane(lane);
+  else showToast('Chat module not loaded');
 }
 
 function startTrackingLane(lane) {
-  if (window.Steeradar?.startRouteTracking) {
-    window.Steeradar.startRouteTracking(lane);
-  } else {
-    showToast('Tracking module not loaded');
-  }
+  if (window.Steeradar?.presence) window.Steeradar.presence.startTracking(lane);
+  else showToast('Tracking module not loaded');
 }
 
-// ─── HEADER ACTIONS ───
+// ─── HEADER ───
 function wireHeaderActions() {
   const refresh = document.getElementById('mapRefresh');
   if (refresh) {
     refresh.onclick = function () {
       this.classList.add('spinning');
-      if (window.Steeradar?.refreshMapStyle) window.Steeradar.refreshMapStyle();
+      if (window.SteeradarApp?.openSettings) {} // no-op
       state.map?.invalidateSize();
       renderBusMarkers();
       hideLaneCard();
@@ -479,7 +559,7 @@ function escapeHtml(s) {
   }[c]));
 }
 
-// ─── PUBLIC API ───
+// ─── PUBLIC ───
 export const lanes = {
   init: initLanes,
   loadFromStorage: loadLanesFromStorage,
@@ -490,6 +570,7 @@ export const lanes = {
   openRequest,
   showCard: showLaneCard,
   hideCard: hideLaneCard,
+  openEdit: openEditLane,
   getVehicleType,
   VEHICLE_TYPES,
 };
