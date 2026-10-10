@@ -14,7 +14,7 @@ window.STEERADAR = {
   // Deployed as: Web app · Execute as Me · Who has access: Anyone
   // Ping test:   YOUR_URL?action=ping&key=steeradar-secret-2026
   // Expected:    {"data":"pong"}
-  SHEET_API_URL: 'https://script.google.com/macros/s/AKfycbw1RLvtA1InEndeJdLvqxPtaxEcZ1GYYyzmbkUbm4nRyO6iRnh8eg8ytcE5br9YZ2_Y/exec',
+  SHEET_API_URL: 'https://script.google.com/macros/s/AKfycbzVNN5psIPQWFSNy1XUD7KXESAVltWfo7Kkm3sLK1LTmgpa00JOz9lbie2xVm4YFF_u/exec',
 
   // Must EXACTLY match SECRET_KEY inside your Apps Script Code.gs
   SHEET_WEBHOOK_SECRET: 'steeradar-secret-2026',
