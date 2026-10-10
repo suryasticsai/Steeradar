@@ -796,3 +796,87 @@ header {
   .view-header h2 { font-size: 1.5rem; }
   .hive-header h1 { font-size: 1.7rem; }
 }
+
+/* ============ Log viewer ============ */
+.log-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.log-content {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  font-family: 'SF Mono', Monaco, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.log-line {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+  word-break: break-word;
+}
+.log-line:last-child { border-bottom: none; }
+.log-time {
+  flex-shrink: 0;
+  color: var(--text-3);
+  font-size: 0.65rem;
+  padding-top: 1px;
+}
+.log-msg { flex: 1; white-space: pre-wrap; }
+.log-error { color: var(--coral); }
+.log-error .log-msg { font-weight: 600; }
+.log-warn { color: var(--amber); }
+.log-info { color: var(--text-2); }
+.log-empty {
+  text-align: center;
+  color: var(--text-3);
+  padding: 40px 0;
+  font-size: 0.8rem;
+  font-family: var(--font);
+}
+
+/* ============ Dev mode hint ============ */
+#versionTap { transition: color 0.2s; }
+#versionTap:active { color: var(--teal); }
+
+/* ============ Edit lane button ============ */
+.lane-card .edit-lane-btn {
+  position: absolute;
+  top: 12px; right: 12px;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+  font-size: 0.9rem;
+  cursor: pointer;
+  z-index: 5;
+}
+.lane-card .edit-lane-btn:active { transform: scale(0.9); }
+.lane-card.mine { position: relative; }
+
+/* ============ Edit button in post detail ============ */
+.pd-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.pd-edit-btn:active { transform: scale(0.96); }
