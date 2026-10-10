@@ -152,18 +152,36 @@ const cloud = {
     return CFG.CLOUD_SYNC_DEFAULT === true && !!CFG.SHEET_API_URL;
   })(),
 
+  lastError: '',
+
   async call(action, params = {}) {
     if (!this.url || !this.enabled) return null;
+    this.lastError = '';
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 20000);
     try {
+      // text/plain keeps this a "simple" request (no CORS preflight, which Apps Script can't answer)
       const res = await fetch(this.url, {
         method: 'POST',
+        redirect: 'follow',
+        signal: ctrl.signal,
         body: JSON.stringify({ action, key: this.key, ...params }),
-        headers: { 'Content-Type': 'text/plain' }
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }
       });
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); }
+      catch {
+        // Google returns an HTML sign-in / error page when the deployment isn't public or the URL is stale
+        throw new Error('Server returned a web page, not JSON — redeploy as "Anyone" and check the URL');
+      }
       if (data.error) throw new Error(data.error);
       return data.data;
-    } catch (e) { console.warn('Cloud:', e); return null; }
+    } catch (e) {
+      this.lastError = e.name === 'AbortError' ? 'Timed out' : (e.message || String(e));
+      console.warn('Cloud:', this.lastError);
+      return null;
+    } finally { clearTimeout(timer); }
   },
 
   async fetchLanes() { return (await this.call('list', { sheet: 'lanes' })) || []; },
@@ -1163,7 +1181,7 @@ function initSettings() {
     const ok = await cloud.test();
     cloud.url = savedUrl; cloud.key = savedKey; cloud.enabled = savedEnabled;
     if (ok) updateCloudStatus('✓ Connected', 'ok');
-    else updateCloudStatus('✗ Failed — check URL & key', 'err');
+    else updateCloudStatus('✗ ' + (cloud.lastError || 'Failed — check URL & key'), 'err');
   };
 
   $('#setClearLanes').onclick = async () => {
@@ -1204,7 +1222,7 @@ function openSettings() {
   $('#setCloudUrl').value = cloud.url;
   $('#setCloudKey').value = cloud.key;
 
-  if (cloud.enabled && cloud.url) updateCloudStatus('✓ Connected', 'ok');
+  if (cloud.enabled && cloud.url) updateCloudStatus('Cloud sync on — tap Test to verify', '');
   else if (cloud.url) updateCloudStatus('Paused', '');
   else updateCloudStatus('Not configured', 'err');
 
@@ -1232,8 +1250,12 @@ function saveSettings() {
   cloud.url = $('#setCloudUrl').value.trim();
   cloud.key = $('#setCloudKey').value.trim();
   localStorage.setItem('steeradar-cloud-enabled', cloud.enabled);
-  localStorage.setItem('steeradar-cloud-url', cloud.url);
-  localStorage.setItem('steeradar-cloud-key', cloud.key);
+  // Only pin URL/key on this device when the user typed a custom value.
+  // Otherwise a redeploy + config.js update would be ignored forever.
+  if (cloud.url && cloud.url !== CFG.SHEET_API_URL) localStorage.setItem('steeradar-cloud-url', cloud.url);
+  else localStorage.removeItem('steeradar-cloud-url');
+  if (cloud.key && cloud.key !== CFG.SHEET_WEBHOOK_SECRET) localStorage.setItem('steeradar-cloud-key', cloud.key);
+  else localStorage.removeItem('steeradar-cloud-key');
 
   renderBusMarkers(); renderLanes(); renderNear(); renderHive();
   closeModal('#settingsModal');
