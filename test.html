@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steeradar · Diagnostic</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+    background: #0F1115;
+    color: #F2F4F8;
+    padding: 20px;
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+  h1 { font-size: 1.4rem; margin-bottom: 8px; color: #00E5C3; }
+  p.sub { color: #8B92A3; font-size: 0.85rem; margin-bottom: 20px; }
+  .file-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 10px;
+    background: #1A1E28;
+    margin-bottom: 8px;
+    border: 1px solid #232834;
+    font-size: 0.85rem;
+  }
+  .status {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.9rem;
+  }
+  .ok     { background: rgba(16, 185, 129, 0.15); color: #34D399; }
+  .fail   { background: rgba(239, 68, 68, 0.15);  color: #F87171; }
+  .warn   { background: rgba(245, 158, 11, 0.15); color: #FBBF24; }
+  .pending{ background: rgba(148, 163, 184, 0.15); color: #94A3B8; }
+  .info { flex: 1; min-width: 0; }
+  .info .name { font-weight: 600; word-break: break-all; }
+  .info .detail {
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 0.72rem;
+    color: #8B92A3;
+    margin-top: 4px;
+    word-break: break-all;
+  }
+  .info .error { color: #F87171; }
+  .summary {
+    margin-top: 20px;
+    padding: 16px;
+    border-radius: 12px;
+    background: #1A1E28;
+    border: 1px solid #232834;
+  }
+  .summary h2 { font-size: 1rem; margin-bottom: 8px; }
+  .summary .line { font-size: 0.85rem; color: #B4BAC6; padding: 4px 0; }
+  .summary .ok   { color: #34D399; }
+  .summary .fail { color: #F87171; }
+  button {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    background: #00E5C3;
+    color: #0F1115;
+    border: none;
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-top: 16px;
+    cursor: pointer;
+  }
+  pre {
+    background: #14171E;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 0.72rem;
+    overflow-x: auto;
+    margin-top: 12px;
+    max-height: 300px;
+    overflow-y: auto;
+    color: #B4BAC6;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+</style>
+</head>
+<body>
+
+<h1>Steeradar · Diagnostic</h1>
+<p class="sub">Fetching every module from the repo to find what's broken.</p>
+
+<div id="results"></div>
+<div id="summary"></div>
+
+<script>
+const REPO = 'https://raw.githubusercontent.com/suryasticsai/Steeradar/main/';
+
+const FILES = [
+  'index.html',
+  'styles.css',
+  'config.js',
+  'app.js',
+  'js/api.js',
+  'js/store.js',
+  'js/logger.js',
+  'js/photos.js',
+  'js/auth.js',
+  'js/onboarding.js',
+  'js/lanes.js',
+  'js/hive.js',
+  'js/chat.js',
+  'js/presence.js',
+  'js/app.js'
+];
+
+// Files that MUST exist for the modular app to boot
+const CRITICAL = [
+  'config.js',
+  'js/api.js',
+  'js/store.js',
+  'js/logger.js',
+  'js/photos.js',
+  'js/auth.js',
+  'js/onboarding.js',
+  'js/lanes.js',
+  'js/hive.js',
+  'js/chat.js',
+  'js/presence.js',
+  'js/app.js'
+];
+
+const resultsEl = document.getElementById('results');
+const summaryEl = document.getElementById('summary');
+const fileResults = {};
+
+function renderRow(name, status, detail) {
+  const row = document.createElement('div');
+  row.className = 'file-row';
+  const statusClass = status === 'ok' ? 'ok' : status === 'fail' ? 'fail' : 'pending';
+  const symbol = status === 'ok' ? '✓' : status === 'fail' ? '✕' : '…';
+  row.innerHTML = `
+    <div class="status ${statusClass}">${symbol}</div>
+    <div class="info">
+      <div class="name">${name}</div>
+      <div class="detail ${status === 'fail' ? 'error' : ''}">${detail || '—'}</div>
+    </div>
+  `;
+  resultsEl.appendChild(row);
+}
+
+async function checkFile(name) {
+  const url = REPO + name;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      return { ok: false, status: res.status, detail: `HTTP ${res.status} — file missing on GitHub` };
+    }
+    const text = await res.text();
+    const size = text.length;
+    const firstLine = text.split('\n')[0].slice(0, 80);
+
+    // Sanity checks
+    const warnings = [];
+    if (name.endsWith('.js') && size < 50) warnings.push('suspiciously small');
+
+    // Check if the module exports anything (for js files)
+    if (name.endsWith('.js') && !text.includes('export') && !name.includes('config') && !name.endsWith('app.js')) {
+      warnings.push('no "export" keyword found');
+    }
+
+    return {
+      ok: true,
+      size,
+      detail: `${size.toLocaleString()} bytes · starts: "${firstLine}…"` +
+              (warnings.length ? ` · ⚠ ${warnings.join(', ')}` : '')
+    };
+  } catch (err) {
+    return { ok: false, status: 0, detail: `Fetch failed: ${err.message}` };
+  }
+}
+
+async function runDiagnostics() {
+  // Initial render with pending state
+  FILES.forEach(f => renderRow(f, 'pending', 'Checking…'));
+
+  const rows = resultsEl.querySelectorAll('.file-row');
+
+  for (let i = 0; i < FILES.length; i++) {
+    const name = FILES[i];
+    const result = await checkFile(name);
+    fileResults[name] = result;
+
+    // Replace the row content
+    const row = rows[i];
+    const statusClass = result.ok ? 'ok' : 'fail';
+    const symbol = result.ok ? '✓' : '✕';
+    row.querySelector('.status').className = 'status ' + statusClass;
+    row.querySelector('.status').textContent = symbol;
+    row.querySelector('.detail').className = 'detail ' + (result.ok ? '' : 'error');
+    row.querySelector('.detail').textContent = result.detail;
+  }
+
+  // Summary
+  const missing = CRITICAL.filter(f => fileResults[f] && !fileResults[f].ok);
+  const present = CRITICAL.filter(f => fileResults[f] && fileResults[f].ok);
+
+  let summaryHtml = `<h2>Summary</h2>`;
+  summaryHtml += `<div class="line ok">✓ ${present.length} / ${CRITICAL.length} critical modules present</div>`;
+
+  if (missing.length === 0) {
+    summaryHtml += `<div class="line ok" style="margin-top:8px;font-weight:700;">🎉 All critical files exist! If the app is still blank, hard refresh (Ctrl+Shift+R or clear site data on mobile).</div>`;
+  } else {
+    summaryHtml += `<div class="line fail" style="margin-top:8px;font-weight:700;">✕ ${missing.length} critical file${missing.length === 1 ? '' : 's'} missing:</div>`;
+    missing.forEach(f => {
+      summaryHtml += `<div class="line fail">• ${f}</div>`;
+    });
+    summaryHtml += `<div class="line" style="margin-top:12px;color:#FBBF24;">→ These files must be added before the app can boot.</div>`;
+  }
+
+  summaryEl.className = 'summary';
+  summaryEl.innerHTML = summaryHtml;
+
+  // Copy-to-clipboard button
+  const btn = document.createElement('button');
+  btn.textContent = '📋 Copy full report';
+  btn.onclick = () => {
+    const text = FILES.map(f => {
+      const r = fileResults[f];
+      return `[${r && r.ok ? 'OK' : 'FAIL'}] ${f} — ${r ? r.detail : 'unknown'}`;
+    }).join('\n');
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = '✓ Copied!';
+      setTimeout(() => { btn.textContent = '📋 Copy full report'; }, 2000);
+    });
+  };
+  document.body.appendChild(btn);
+
+  // Auto-run module import test
+  runModuleTest();
+}
+
+async function runModuleTest() {
+  const testEl = document.createElement('div');
+  testEl.className = 'summary';
+  testEl.innerHTML = `<h2>Module import test</h2><div class="line">Attempting to import js/app.js…</div><pre id="importResult"></pre>`;
+  document.body.appendChild(testEl);
+
+  try {
+    // Try to import the main app module
+    await import('./js/app.js');
+    document.getElementById('importResult').textContent = '✓ js/app.js imported successfully!';
+    document.getElementById('importResult').style.color = '#34D399';
+  } catch (err) {
+    document.getElementById('importResult').textContent =
+      '✕ Import failed:\n\n' +
+      'Message: ' + (err.message || 'unknown') + '\n\n' +
+      'Stack:\n' + (err.stack || '');
+    document.getElementById('importResult').style.color = '#F87171';
+  }
+}
+
+runDiagnostics();
+</script>
+
+</body>
+</html>
