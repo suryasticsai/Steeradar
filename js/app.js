@@ -1,27 +1,66 @@
-// js/app.js — Boot + wiring. Replaces the legacy root app.js entirely.
-// Responsibilities:
-//   1. Decide onboarding vs unlock
-//   2. Init all feature modules (lanes, chat, hive, presence, auth)
-//   3. Set up the map (Leaflet + MapLibre GL via OpenFreeMap)
-//   4. Handle geolocation → join mesh → start presence
-//   5. Wire tab navigation, FAB, settings, HUD, cloud polling
+// js/app.js — Boot + wiring. Full version.
 
 import { api } from './api.js';
 import {
   state, storage, session, showToast,
   loadLanes, loadHive, saveLanes, saveHive,
-  setTimer, clearTimer, clearAllTimers,
+  setTimer, clearTimer,
   getVehicleType, geohash, normalizeVehicle, validateVehicle,
 } from './store.js';
 
 import { initOnboarding, getPhotos, resetOnboarding } from './onboarding.js';
 import { initAuth, openAuthSheet, logout, validateSessionOnBoot } from './auth.js';
-import { lanes } from './lanes.js';
+import { lanes, initEditLane, openEditLane } from './lanes.js';
 import { chat } from './chat.js';
 import { hive } from './hive.js';
 import { presence } from './presence.js';
+import { logger } from './logger.js';
 
 const CFG = window.STEERADAR || {};
+
+// ═══════════════════════════════════════════════════════════════
+//  GLOBAL ERROR HANDLER
+// ═══════════════════════════════════════════════════════════════
+window.addEventListener('error', (e) => {
+  console.error('[Steeradar] error:', e.message, e.filename, e.lineno);
+});
+window.addEventListener('unhandledrejection', (e) => {
+  console.error('[Steeradar] unhandled rejection:', e.reason);
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  MODAL CLOSE BUTTONS
+// ═══════════════════════════════════════════════════════════════
+function initModalCloseButtons() {
+  document.querySelectorAll('[data-close]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const sel = btn.getAttribute('data-close');
+      const target = document.querySelector(sel);
+      if (target) target.classList.remove('active');
+    });
+  });
+
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.classList.remove('active');
+    });
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+    }
+  });
+
+  const authClose = document.getElementById('authClose');
+  if (authClose) {
+    authClose.addEventListener('click', () => {
+      document.getElementById('authModal')?.classList.remove('active');
+    });
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════
 //  BOOT
@@ -29,76 +68,69 @@ const CFG = window.STEERADAR || {};
 function boot() {
   const savedVehicle = storage.raw('vehicle', '');
 
-  // ─── Path A: no vehicle yet → onboarding gate ───
   if (!savedVehicle || !validateVehicle(savedVehicle)) {
-    const unlockedImmediately = initOnboarding(() => boot());
-    if (!unlockedImmediately) return; // gate shown; boot re-runs after unlock
+    const unlocked = initOnboarding(() => boot());
+    if (!unlocked) return;
   }
 
-  // ─── Path B: vehicle ready → unlock the app ───
   state.vehicle = savedVehicle || state.vehicle;
   unlockApp();
 }
 
 function unlockApp() {
-  // 1. Basic setup
-  document.getElementById('onboardGate')?.style.setProperty('display', 'none');
+  try {
+    document.getElementById('onboardGate')?.style.setProperty('display', 'none');
 
-  // 2. Load locally cached data
-  lanes.loadFromStorage();
-  hive.loadFromStorage();
+    lanes.loadFromStorage();
+    hive.loadFromStorage();
 
-  // 3. Init feature modules
-  lanes.init();
-  hive.init();
-  chat.init();
-  initAuth();
+    logger.init();
+    initModalCloseButtons();
 
-  // 4. Update UI from state
-  updateVehicleBadge();
-  updateAvatar();
-  loadTheme();
-  loadMapStylePref();
+    lanes.init();
+    hive.init();
+    chat.init();
+    initAuth();
+    initEditLane();
 
-  // 5. Map + geolocation
-  initMap();
-  startGeolocation();
+    wireLogViewer();
+    wireDevMode();
 
-  // 6. Bottom nav + FAB
-  wireNav();
-  wireFab();
-  wireHeaderActions();
-  wireTrackingHud();
-  wireSettings();
+    updateVehicleBadge();
+    updateAvatar();
+    loadTheme();
 
-  // 7. Cloud sync + presence loops
-  startCloudPolling();
-  if (presence.start) presence.start();
+    initMap();
+    startGeolocation();
 
-  // 8. Session validation (silent, non-blocking)
-  validateSessionOnBoot().then(ok => {
-    if (ok) {
-      updateAvatar();
-      showToast('Welcome back, ' + (state.userName || ''), 'success');
-    }
-  });
+    wireNav();
+    wireFab();
+    wireHeaderActions();
+    wireTrackingHud();
+    wireSettings();
 
-  // 9. Pause on hide / resume on show
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      clearTimer('cloudPoll');
-    } else {
-      startCloudPolling();
-      syncAll(true);
-    }
-  });
+    startCloudPolling();
+    try { presence.start(); } catch (e) { console.warn('presence.start failed:', e); }
 
-  console.log(
-    '%c Steeradar booted ',
-    'background:#0D9488;color:#fff;font-weight:800;padding:4px 10px;border-radius:4px',
-    '· vehicle:', state.vehicle,
-    '· user:', state.userName || 'anonymous'
-  );
+    validateSessionOnBoot().then(ok => {
+      if (ok) updateAvatar();
+    }).catch(() => {});
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) clearTimer('cloudPoll');
+      else { startCloudPolling(); syncAll(true); }
+    });
+
+    console.log(
+      '%c Steeradar booted ',
+      'background:#0D9488;color:#fff;font-weight:800;padding:4px 10px;border-radius:4px',
+      '· vehicle:', state.vehicle,
+      '· user:', state.userName || 'anonymous'
+    );
+  } catch (err) {
+    console.error('[Steeradar] unlock failed:', err);
+    showToast('Boot error: ' + err.message, 'error');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -115,7 +147,6 @@ function updateAvatar() {
 }
 
 function wireHeaderActions() {
-  // Notification permission
   document.getElementById('notifBtn')?.addEventListener('click', async () => {
     if (!('Notification' in window)) { showToast('Notifications not supported', 'error'); return; }
     if (Notification.permission === 'granted') { showToast('Notifications are on'); return; }
@@ -124,11 +155,9 @@ function wireHeaderActions() {
               p === 'granted' ? 'success' : 'error');
   });
 
-  // Avatar → settings
   document.getElementById('avatarBtn')?.addEventListener('click', openSettings);
   document.getElementById('vehicleBadge')?.addEventListener('click', openSettings);
 
-  // Location pill → refresh position
   document.getElementById('locationPill')?.addEventListener('click', () => {
     if (!navigator.geolocation) { showToast('Location unavailable', 'error'); return; }
     showToast('Updating location…');
@@ -140,21 +169,17 @@ function wireHeaderActions() {
         if (state.map) state.map.setView([latitude, longitude], 14);
         placeUserMarker(latitude, longitude);
         reverseGeocode(latitude, longitude);
-
         const newGh = geohash(latitude, longitude, 6);
         if (newGh !== state.userGeohash) {
-          showToast('Entering new neighbourhood · rejoining mesh');
+          showToast('Entering new neighbourhood · rejoining');
           setTimeout(() => location.reload(), 800);
-        } else {
-          showToast('Location updated', 'success');
-        }
+        } else showToast('Location updated', 'success');
       },
       () => showToast('Enable location to update', 'error'),
       { enableHighAccuracy: true, timeout: 8000 }
     );
   });
 
-  // Map refresh
   document.getElementById('mapRefresh')?.addEventListener('click', function () {
     this.classList.add('spinning');
     refreshMapStyle();
@@ -165,7 +190,6 @@ function wireHeaderActions() {
     showToast('Map refreshed', 'success');
   });
 
-  // Bluetooth scan
   document.getElementById('btScanBtn')?.addEventListener('click', scanBluetooth);
 }
 
@@ -180,25 +204,16 @@ function getMapStyle() {
 
 function initMap() {
   if (state.map) return;
-
   const center = CFG.DEFAULT_CENTER || { lat: 12.9716, lng: 77.5946 };
   state.map = L.map('map', {
-    zoomControl: false,
-    attributionControl: false,
-    center: [center.lat, center.lng],
-    zoom: CFG.DEFAULT_ZOOM || 12,
+    zoomControl: false, attributionControl: false,
+    center: [center.lat, center.lng], zoom: CFG.DEFAULT_ZOOM || 12,
   });
-
-  if (typeof L.maplibreGL === 'function') {
-    try {
-      state.mapLibreLayer = L.maplibreGL({ style: getMapStyle(), interactive: false }).addTo(state.map);
-    } catch {
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(state.map);
-    }
-  } else {
+  try {
+    state.mapLibreLayer = L.maplibreGL({ style: getMapStyle(), interactive: false }).addTo(state.map);
+  } catch {
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(state.map);
   }
-
   lanes.renderMarkers();
 }
 
@@ -212,12 +227,7 @@ function refreshMapStyle() {
 function placeUserMarker(lat, lng) {
   if (state.userMarker) state.map.removeLayer(state.userMarker);
   state.userMarker = L.marker([lat, lng], {
-    icon: L.divIcon({
-      className: '',
-      html: '<div class="user-marker-wrap"></div>',
-      iconSize: [22, 22],
-      iconAnchor: [11, 11],
-    }),
+    icon: L.divIcon({ className: '', html: '<div class="user-marker-wrap"></div>', iconSize: [22, 22], iconAnchor: [11, 11] }),
   }).addTo(state.map);
 }
 
@@ -231,7 +241,6 @@ function startGeolocation() {
     finishGeolocation(12.9716, 77.5946);
     return;
   }
-
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       const { latitude, longitude } = pos.coords;
@@ -252,7 +261,6 @@ function startGeolocation() {
 }
 
 function finishGeolocation(lat, lng) {
-  // Join the geohash mesh
   presence.joinMesh(lat, lng).catch(e => console.warn('Mesh join failed:', e));
 }
 
@@ -264,8 +272,7 @@ function reverseGeocode(lat, lng) {
     .then(data => {
       if (data && data.address) {
         const a = data.address;
-        const parts = [a.suburb || a.neighbourhood || a.village, a.city || a.town || a.state_district]
-          .filter(Boolean);
+        const parts = [a.suburb || a.neighbourhood || a.village, a.city || a.town || a.state_district].filter(Boolean);
         setText('locText', parts.length ? parts.join(', ') : 'Your location');
       }
     })
@@ -289,25 +296,16 @@ function wireNav() {
   });
 }
 
-function switchTab(tab) {
-  const btn = document.querySelector(`.nav-item[data-tab="${tab}"]`);
-  if (btn) btn.click();
-}
-
 function updateFab() {
   const label = document.getElementById('fabLabel');
   const sub = document.getElementById('fabSub');
   if (!label || !sub) return;
-
   if (state.currentTab === 'pulse' || state.currentTab === 'lanes') {
-    label.textContent = 'Post my lane';
-    sub.textContent = 'Share seats & route';
+    label.textContent = 'Post my lane'; sub.textContent = 'Share seats & route';
   } else if (state.currentTab === 'near') {
-    label.textContent = 'Broadcast local';
-    sub.textContent = 'Message nearby drivers';
+    label.textContent = 'Broadcast local'; sub.textContent = 'Message nearby drivers';
   } else {
-    label.textContent = 'New post';
-    sub.textContent = 'Share with the community';
+    label.textContent = 'New post'; sub.textContent = 'Share with the community';
   }
 }
 
@@ -324,8 +322,7 @@ function wireFab() {
         text: state.userName + ' is now visible nearby 👋',
         sender: state.userName,
       });
-      showToast(sent ? `Broadcast to ${sent} neighbour${sent === 1 ? '' : 's'}` : 'You are visible nearby ✓',
-                'success');
+      showToast(sent ? `Broadcast to ${sent} neighbour${sent === 1 ? '' : 's'}` : 'You are visible nearby ✓', 'success');
     } else {
       hive.openCompose();
     }
@@ -339,7 +336,6 @@ function wireTrackingHud() {
   document.getElementById('trackClose')?.addEventListener('click', () => presence.stopTracking());
 
   document.getElementById('trackChat')?.addEventListener('click', () => {
-    // Rebuild the target lane from state so chat.js can open it
     const id = state.trackedLaneId;
     if (!id) return;
     let target = state.lanes.find(l => l.id === id);
@@ -348,16 +344,11 @@ function wireTrackingHud() {
       target = state.cloudPeers.get(vehicle);
     }
     if (!target) return;
-
     const fakeLane = {
       id: 'peer-' + (target.vehicle || target.id),
       driver: target.name || target.driver,
-      avatar: target.avatar,
-      phone: target.phone,
-      vehicle: target.vehicle,
-      vehicleType: target.vehicleType,
-      peerId: target.peerId,
-      mine: false,
+      avatar: target.avatar, phone: target.phone, vehicle: target.vehicle,
+      vehicleType: target.vehicleType, peerId: target.peerId, mine: false,
       route: { from: '', via: [], to: 'Direct chat' },
       seats: { total: 0, taken: 0 },
     };
@@ -368,10 +359,7 @@ function wireTrackingHud() {
 // ═══════════════════════════════════════════════════════════════
 //  THEME
 // ═══════════════════════════════════════════════════════════════
-function loadTheme() {
-  const mode = storage.raw('theme', 'light');
-  applyTheme(mode);
-}
+function loadTheme() { applyTheme(storage.raw('theme', 'light')); }
 
 function applyTheme(mode) {
   const resolved = mode === 'auto'
@@ -383,17 +371,12 @@ function applyTheme(mode) {
   if (meta) meta.setAttribute('content', resolved === 'dark' ? '#0A0B0E' : '#FFFFFF');
 }
 
-function loadMapStylePref() {
-  // Nothing to do here — getMapStyle() reads from storage each time
-}
-
 // ═══════════════════════════════════════════════════════════════
 //  SETTINGS
 // ═══════════════════════════════════════════════════════════════
 function wireSettings() {
   document.getElementById('settingsSave')?.addEventListener('click', saveSettings);
 
-  // Live theme preview
   document.querySelectorAll('#setTheme button').forEach(b => {
     b.addEventListener('click', () => {
       document.querySelectorAll('#setTheme button').forEach(x => x.classList.toggle('active', x === b));
@@ -401,7 +384,6 @@ function wireSettings() {
     });
   });
 
-  // Live map style preview
   document.querySelectorAll('#setMapStyle button').forEach(b => {
     b.addEventListener('click', () => {
       document.querySelectorAll('#setMapStyle button').forEach(x => x.classList.toggle('active', x === b));
@@ -410,57 +392,33 @@ function wireSettings() {
     });
   });
 
-  // Cloud test
   document.getElementById('cloudTest')?.addEventListener('click', async () => {
-    const url = document.getElementById('setCloudUrl').value.trim();
-    const key = document.getElementById('setCloudKey').value.trim();
-    if (!url) { setCloudStatus('Enter a URL first', 'err'); return; }
-    if (!key) { setCloudStatus('Enter the secret key', 'err'); return; }
-
     setCloudStatus('Testing…');
-    const savedUrl = api.url, savedKey = api.key;
-    api.url = url;
-    api.key = key;
-
     const ok = await api.ping();
     if (ok) {
       const dbg = await api.debug();
-      api.url = savedUrl;
-      api.key = savedKey;
-      setCloudStatus(
-        '✓ Connected · ' + (dbg?.lanes ?? 0) + ' lanes, ' + (dbg?.hive ?? 0) + ' posts',
-        'ok'
-      );
+      setCloudStatus('✓ Connected · ' + (dbg?.lanes ?? 0) + ' lanes, ' + (dbg?.hive ?? 0) + ' posts', 'ok');
     } else {
-      const err = api.lastError;
-      api.url = savedUrl;
-      api.key = savedKey;
-      setCloudStatus('✗ ' + err, 'err');
+      setCloudStatus('✗ ' + (api.lastError || 'failed'), 'err');
     }
   });
 
-  // Clear lanes
   document.getElementById('setClearLanes')?.addEventListener('click', async () => {
     if (!confirm('Delete all your published lanes on this device?')) return;
     const mine = state.lanes.filter(l => l.mine);
     for (const l of mine) { try { await api.removeLane(l.id); } catch {} }
     state.lanes = state.lanes.filter(l => !l.mine);
     saveLanes();
-    lanes.render();
-    lanes.renderMarkers();
+    lanes.render(); lanes.renderMarkers();
     showToast('Your lanes cleared', 'success');
   });
 
-  // Reset all
   document.getElementById('setResetAll')?.addEventListener('click', () => {
     if (!confirm('Reset everything? You will see onboarding again.')) return;
-    Object.keys(localStorage)
-      .filter(k => k.startsWith('steeradar-'))
-      .forEach(k => localStorage.removeItem(k));
+    Object.keys(localStorage).filter(k => k.startsWith('steeradar-')).forEach(k => localStorage.removeItem(k));
     location.reload();
   });
 
-  // Auth buttons
   document.getElementById('authOpenBtn')?.addEventListener('click', () => {
     document.getElementById('settingsModal')?.classList.remove('active');
     openAuthSheet(session.isLoggedIn() ? 'login' : 'register');
@@ -473,22 +431,16 @@ function wireSettings() {
 }
 
 function openSettings() {
-  // Populate fields
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
   set('setName', state.userName);
   set('setVehicle', state.vehicle);
 
-  // Theme
   const theme = storage.raw('theme', 'light');
-  document.querySelectorAll('#setTheme button').forEach(b =>
-    b.classList.toggle('active', b.dataset.value === theme));
+  document.querySelectorAll('#setTheme button').forEach(b => b.classList.toggle('active', b.dataset.value === theme));
 
-  // Map style
   const mapStyle = storage.raw('map-style', 'bright');
-  document.querySelectorAll('#setMapStyle button').forEach(b =>
-    b.classList.toggle('active', b.dataset.value === mapStyle));
+  document.querySelectorAll('#setMapStyle button').forEach(b => b.classList.toggle('active', b.dataset.value === mapStyle));
 
-  // Toggles
   const toggle = (id, val) => { const el = document.getElementById(id); if (el) el.checked = val; };
   toggle('setNotifChat',  storage.raw('notif-chat', 'true') !== 'false');
   toggle('setNotifSeats', storage.raw('notif-seats', 'true') !== 'false');
@@ -502,9 +454,7 @@ function openSettings() {
   set('setCloudUrl', api.url);
   set('setCloudKey', api.key);
 
-  // Status
-  if (api.url) setCloudStatus(state.cloudOnline ? 'Cloud sync on' : ('✗ ' + (state.cloudLastError || 'offline')),
-                              state.cloudOnline ? 'ok' : 'err');
+  if (api.url) setCloudStatus(state.cloudOnline ? 'Cloud sync on' : ('✗ ' + (state.cloudLastError || 'offline')), state.cloudOnline ? 'ok' : 'err');
   else setCloudStatus('Not configured', 'err');
 
   document.getElementById('settingsModal')?.classList.add('active');
@@ -525,7 +475,6 @@ function saveSettings() {
     return;
   }
 
-  // Persist toggles
   storage.setRaw('notif-chat', document.getElementById('setNotifChat')?.checked);
   storage.setRaw('notif-seats', document.getElementById('setNotifSeats')?.checked);
   storage.setRaw('share-gps', document.getElementById('setShareGps')?.checked);
@@ -534,24 +483,21 @@ function saveSettings() {
   storage.setRaw('show-plate', document.getElementById('setShowPlate')?.checked);
   storage.setRaw('share-upi', document.getElementById('setShareUpi')?.checked);
 
-  // Cloud config
   const cloudOn = document.getElementById('setCloudSync')?.checked;
-  const url = document.getElementById('setCloudUrl')?.value.trim();
-  const key = document.getElementById('setCloudKey')?.value.trim();
-
   storage.setRaw('cloud-enabled', cloudOn ? 'true' : 'false');
-  if (url && url !== CFG.SHEET_API_URL) storage.setRaw('cloud-url', url);
-  else storage.removeRaw('cloud-url');
-  if (key && key !== CFG.SHEET_WEBHOOK_SECRET) storage.setRaw('cloud-key', key);
-  else storage.removeRaw('cloud-key');
 
-  api.url = url || CFG.SHEET_API_URL || '';
-  api.key = key || CFG.SHEET_WEBHOOK_SECRET || '';
+  const devBlock = document.getElementById('devModeBlock');
+  if (devBlock && devBlock.style.display === 'block') {
+    const url = document.getElementById('setCloudUrl')?.value.trim();
+    const key = document.getElementById('setCloudKey')?.value.trim();
+    if (url && url !== CFG.SHEET_API_URL) storage.setRaw('cloud-url', url); else storage.removeRaw('cloud-url');
+    if (key && key !== CFG.SHEET_WEBHOOK_SECRET) storage.setRaw('cloud-key', key); else storage.removeRaw('cloud-key');
+    if (url) api.url = url;
+    if (key) api.key = key;
+  }
 
   document.getElementById('settingsModal')?.classList.remove('active');
   showToast('Settings saved', 'success');
-
-  // Restart polling with new config
   startCloudPolling();
 }
 
@@ -566,11 +512,7 @@ function setCloudStatus(text, variant) {
 //  CLOUD POLLING
 // ═══════════════════════════════════════════════════════════════
 async function syncAll(silent = true) {
-  if (!silent) showToast('Syncing…');
-  await Promise.all([
-    lanes.syncFromCloud(),
-    hive.syncFromCloud(),
-  ]);
+  await Promise.all([lanes.syncFromCloud(), hive.syncFromCloud()]);
 }
 
 function startCloudPolling() {
@@ -587,29 +529,20 @@ async function scanBluetooth() {
   if (!navigator.bluetooth) { showToast('Web Bluetooth not supported', 'error'); return; }
   const btn = document.getElementById('btScanBtn');
   if (!btn) return;
-
-  btn.disabled = true;
-  btn.textContent = 'Scanning…';
-
+  btn.disabled = true; btn.textContent = 'Scanning…';
   try {
     const device = await navigator.bluetooth.requestDevice({
       acceptAllDevices: true,
       optionalServices: ['generic_access', 'device_information', 'battery_service'],
     });
-
     if (!state.btDevices.find(d => d.id === device.id)) {
       state.btDevices.push({
-        id: device.id,
-        name: device.name || 'Unknown device',
-        connected: false,
-        rssi: -Math.floor(40 + Math.random() * 50),
-        device,
+        id: device.id, name: device.name || 'Unknown device',
+        connected: false, rssi: -Math.floor(40 + Math.random() * 50), device,
       });
     }
-
     renderBluetooth();
     showToast('Found: ' + (device.name || 'Unknown'));
-
     try {
       await device.gatt.connect();
       const entry = state.btDevices.find(d => d.id === device.id);
@@ -624,20 +557,17 @@ async function scanBluetooth() {
   } catch (err) {
     if (err.name !== 'NotFoundError') showToast('Bluetooth scan failed', 'error');
   } finally {
-    btn.disabled = false;
-    btn.textContent = 'Scan';
+    btn.disabled = false; btn.textContent = 'Scan';
   }
 }
 
 function renderBluetooth() {
   const wrap = document.getElementById('btDevices');
   if (!wrap) return;
-
   if (!state.btDevices.length) {
     wrap.innerHTML = '<div class="bt-empty">Tap Scan to discover nearby Bluetooth devices</div>';
     return;
   }
-
   wrap.innerHTML = state.btDevices.map(d => `
     <div class="bt-device" data-id="${d.id}">
       <div class="bt-icon">${d.connected ? '🔗' : '📶'}</div>
@@ -648,7 +578,6 @@ function renderBluetooth() {
       <button class="bt-action" data-action="toggle">${d.connected ? 'Drop' : 'Connect'}</button>
     </div>
   `).join('');
-
   wrap.querySelectorAll('[data-action="toggle"]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const dev = state.btDevices.find(d => d.id === btn.closest('.bt-device').dataset.id);
@@ -663,37 +592,24 @@ function renderBluetooth() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  PEERJS BOOT
+//  PEERJS
 // ═══════════════════════════════════════════════════════════════
 function initPeer() {
-  if (typeof Peer === 'undefined') {
-    console.warn('PeerJS not loaded');
-    return;
-  }
-
+  if (typeof Peer === 'undefined') { console.warn('PeerJS not loaded'); return; }
   const id = 'steeradar-veh-' + state.vehicle;
   state.peerId = id;
-
-  try {
-    state.peer = new Peer(id, { debug: 0 });
-  } catch (e) {
-    console.warn('Peer init failed:', e);
-    return;
-  }
+  try { state.peer = new Peer(id, { debug: 0 }); } catch (e) { console.warn('Peer init failed:', e); return; }
 
   state.peer.on('open', () => {
     setConnBadge(true, 'Online');
-    // Update the presence row with our peer ID
     try { presence.start(); } catch {}
   });
-
   state.peer.on('connection', (conn) => {
     conn.on('open', () => {
       state.connections.set(conn.peer, conn);
       attachPeerHandlers(conn);
     });
   });
-
   state.peer.on('error', (err) => {
     if (err.type === 'unavailable-id') {
       try { state.peer.destroy(); } catch {}
@@ -702,18 +618,12 @@ function initPeer() {
       try { state.peer = new Peer(newId, { debug: 0 }); } catch { return; }
       state.peer.on('open', () => setConnBadge(true, 'Online'));
       state.peer.on('connection', (c) => {
-        c.on('open', () => {
-          state.connections.set(c.peer, c);
-          attachPeerHandlers(c);
-        });
+        c.on('open', () => { state.connections.set(c.peer, c); attachPeerHandlers(c); });
       });
-    } else if (err.type === 'peer-unavailable') {
-      // Quiet — happens when dialing an offline peer
-    } else {
+    } else if (err.type !== 'peer-unavailable') {
       setConnBadge(false, 'Connection issue');
     }
   });
-
   state.peer.on('disconnected', () => {
     setConnBadge(false, 'Reconnecting…');
     setTimeout(() => { try { state.peer.reconnect(); } catch {} }, 2000);
@@ -723,10 +633,8 @@ function initPeer() {
 function attachPeerHandlers(conn) {
   conn.on('data', (data) => {
     if (!data || typeof data !== 'object') return;
-
     if (data.type === 'chat') {
-      // Route into chat.js; it decides whether to render, persist, and notify
-      chat.receive(data.text, data.sender, chat.activeRoomId);
+      try { chat.receive(data.text, data.sender, chat.activeRoomId); } catch {}
     } else if (data.type === 'hive-post') {
       if (!state.hivePosts.find(p => p.id === data.post.id)) {
         state.hivePosts.push(data.post);
@@ -735,10 +643,7 @@ function attachPeerHandlers(conn) {
       }
     }
   });
-
-  conn.on('close', () => {
-    state.connections.delete(conn.peer);
-  });
+  conn.on('close', () => state.connections.delete(conn.peer));
 }
 
 function setConnBadge(online, text) {
@@ -750,11 +655,74 @@ function setConnBadge(online, text) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  START
+//  LOG VIEWER
 // ═══════════════════════════════════════════════════════════════
-function startPeerOnceVehicleReady() {
-  if (!state.vehicle) return;
-  initPeer();
+function wireLogViewer() {
+  document.getElementById('logCopy')?.addEventListener('click', () => logger.export());
+  document.getElementById('logClear')?.addEventListener('click', () => logger.clear());
+  document.getElementById('logRefresh')?.addEventListener('click', () => logger.render());
+
+  // Long-press on logo (600ms) opens the log
+  const logo = document.getElementById('logoTrigger');
+  if (logo) {
+    let holdTimer = null;
+    const start = (e) => {
+      e.preventDefault();
+      holdTimer = setTimeout(() => {
+        holdTimer = null;
+        logger.render();
+        document.getElementById('logModal')?.classList.add('active');
+      }, 600);
+    };
+    const cancel = () => {
+      if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+    };
+    logo.addEventListener('touchstart', start, { passive: false });
+    logo.addEventListener('touchend', cancel);
+    logo.addEventListener('touchcancel', cancel);
+    logo.addEventListener('mousedown', start);
+    logo.addEventListener('mouseup', cancel);
+    logo.addEventListener('mouseleave', cancel);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DEV MODE — 5 taps on the version line
+// ═══════════════════════════════════════════════════════════════
+let _devTaps = 0;
+let _devTimer = null;
+function wireDevMode() {
+  const tapTarget = document.getElementById('versionTap');
+  if (!tapTarget) return;
+
+  tapTarget.addEventListener('click', () => {
+    _devTaps++;
+    if (_devTimer) clearTimeout(_devTimer);
+    _devTimer = setTimeout(() => { _devTaps = 0; }, 2500);
+
+    if (_devTaps >= 5) {
+      _devTaps = 0;
+      const block = document.getElementById('devModeBlock');
+      const hint  = document.getElementById('devModeHint');
+      if (block) {
+        const shown = block.style.display === 'block';
+        block.style.display = shown ? 'none' : 'block';
+        if (hint) hint.textContent = shown ? 'tap 5 times for diagnostics' : 'dev mode on';
+      }
+    }
+  });
+
+  document.getElementById('cloudSaveDev')?.addEventListener('click', () => {
+    const url = document.getElementById('setCloudUrl')?.value.trim();
+    const key = document.getElementById('setCloudKey')?.value.trim();
+    if (!url || !key) { showToast('Both fields required', 'error'); return; }
+    storage.setRaw('cloud-url', url);
+    storage.setRaw('cloud-key', key);
+    api.url = url;
+    api.key = key;
+    showToast('Endpoint saved · reloading', 'success');
+    setTimeout(() => location.reload(), 600);
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -776,7 +744,7 @@ function escapeHtml(s) {
 // ═══════════════════════════════════════════════════════════════
 function main() {
   boot();
-  startPeerOnceVehicleReady();
+  if (state.vehicle) initPeer();
 }
 
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
@@ -785,14 +753,7 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
   document.addEventListener('DOMContentLoaded', main);
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  PUBLIC API (used by index.html module script for debugging)
-// ═══════════════════════════════════════════════════════════════
 window.SteeradarApp = {
-  boot,
-  unlockApp,
-  syncAll,
-  openSettings,
-  switchTab,
+  boot, unlockApp, syncAll, openSettings,
   getState: () => state,
 };
