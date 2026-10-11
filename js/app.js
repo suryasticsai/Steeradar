@@ -1,4 +1,4 @@
-// js/app.js — Boot + wiring. Full version.
+// js/app.js - Boot + wiring
 
 import { api } from './api.js';
 import {
@@ -8,9 +8,9 @@ import {
   getVehicleType, geohash, normalizeVehicle, validateVehicle,
 } from './store.js';
 
-import { initOnboarding, getPhotos, resetOnboarding } from './onboarding.js';
+import { initOnboarding } from './onboarding.js';
 import { initAuth, openAuthSheet, logout, validateSessionOnBoot } from './auth.js';
-import { lanes, initEditLane, openEditLane } from './lanes.js';
+import { lanes, initEditLane } from './lanes.js';
 import { chat } from './chat.js';
 import { hive } from './hive.js';
 import { presence } from './presence.js';
@@ -18,19 +18,21 @@ import { logger } from './logger.js';
 
 const CFG = window.STEERADAR || {};
 
-// ═══════════════════════════════════════════════════════════════
-//  GLOBAL ERROR HANDLER
-// ═══════════════════════════════════════════════════════════════
+let _booted = false;
+
+// ============================================================
+//  GLOBAL ERROR HANDLERS
+// ============================================================
 window.addEventListener('error', (e) => {
-  console.error('[Steeradar] error:', e.message, e.filename, e.lineno);
+  console.error('[Steeradar]', e.message, e.filename, e.lineno);
 });
 window.addEventListener('unhandledrejection', (e) => {
-  console.error('[Steeradar] unhandled rejection:', e.reason);
+  console.error('[Steeradar] rejection:', e.reason);
 });
 
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 //  MODAL CLOSE BUTTONS
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 function initModalCloseButtons() {
   document.querySelectorAll('[data-close]').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -62,55 +64,66 @@ function initModalCloseButtons() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 //  BOOT
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 function boot() {
   const savedVehicle = storage.raw('vehicle', '');
-
   if (!savedVehicle || !validateVehicle(savedVehicle)) {
-    const unlocked = initOnboarding(() => boot());
-    if (!unlocked) return;
+    console.log('[Steeradar] No vehicle found, gate is waiting');
+    return;
   }
-
-  state.vehicle = savedVehicle || state.vehicle;
+  state.vehicle = savedVehicle;
   unlockApp();
 }
 
 function unlockApp() {
-  try {
-    document.getElementById('onboardGate')?.style.setProperty('display', 'none');
+  if (_booted) return;
+  _booted = true;
 
+  try {
+    document.getElementById('onboardGate')?.classList.add('gate-hidden');
+
+    // Load from local storage
     lanes.loadFromStorage();
     hive.loadFromStorage();
 
+    // Init logger first so it captures everything
     logger.init();
     initModalCloseButtons();
 
-    lanes.init();
-    hive.init();
-    chat.init();
-    initAuth();
-    initEditLane();
+    // Init feature modules
+    try { lanes.init(); } catch (e) { console.warn('lanes.init:', e); }
+    try { hive.init(); } catch (e) { console.warn('hive.init:', e); }
+    try { chat.init(); } catch (e) { console.warn('chat.init:', e); }
+    try { initAuth(); } catch (e) { console.warn('initAuth:', e); }
+    try { initEditLane(); } catch (e) { console.warn('initEditLane:', e); }
 
     wireLogViewer();
     wireDevMode();
+    wireTabs();
+    wireFab();
+    wireHeaderActions();
+    wireTrackingHud();
+    wireSettings();
+    wireFilterChips();
 
     updateVehicleBadge();
     updateAvatar();
     loadTheme();
 
     initMap();
-    startGeolocation();
-
-    wireNav();
-    wireFab();
-    wireHeaderActions();
-    wireTrackingHud();
-    wireSettings();
+    // Delay geolocation slightly so map container has real dimensions
+    setTimeout(() => {
+      if (state.map) {
+        state.map.invalidateSize();
+        lanes.renderMarkers();
+      }
+      startGeolocation();
+    }, 250);
 
     startCloudPolling();
-    try { presence.start(); } catch (e) { console.warn('presence.start failed:', e); }
+    try { presence.start(); } catch (e) { console.warn('presence.start:', e); }
 
     validateSessionOnBoot().then(ok => {
       if (ok) updateAvatar();
@@ -118,14 +131,18 @@ function unlockApp() {
 
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) clearTimer('cloudPoll');
-      else { startCloudPolling(); syncAll(true); }
+      else {
+        startCloudPolling();
+        syncAll(true);
+        if (state.map) setTimeout(() => state.map.invalidateSize(), 100);
+      }
     });
 
     console.log(
       '%c Steeradar booted ',
       'background:#0D9488;color:#fff;font-weight:800;padding:4px 10px;border-radius:4px',
-      '· vehicle:', state.vehicle,
-      '· user:', state.userName || 'anonymous'
+      '- vehicle:', state.vehicle,
+      '- user:', state.userName || 'anonymous'
     );
   } catch (err) {
     console.error('[Steeradar] unlock failed:', err);
@@ -133,12 +150,12 @@ function unlockApp() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 //  HEADER
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 function updateVehicleBadge() {
   const el = document.getElementById('vehicleBadgeText');
-  if (el) el.textContent = state.vehicle || '—';
+  if (el) el.textContent = state.vehicle || '-';
 }
 
 function updateAvatar() {
@@ -160,7 +177,7 @@ function wireHeaderActions() {
 
   document.getElementById('locationPill')?.addEventListener('click', () => {
     if (!navigator.geolocation) { showToast('Location unavailable', 'error'); return; }
-    showToast('Updating location…');
+    showToast('Updating location...');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
@@ -171,7 +188,7 @@ function wireHeaderActions() {
         reverseGeocode(latitude, longitude);
         const newGh = geohash(latitude, longitude, 6);
         if (newGh !== state.userGeohash) {
-          showToast('Entering new neighbourhood · rejoining');
+          showToast('Entering new neighbourhood');
           setTimeout(() => location.reload(), 800);
         } else showToast('Location updated', 'success');
       },
@@ -183,7 +200,7 @@ function wireHeaderActions() {
   document.getElementById('mapRefresh')?.addEventListener('click', function () {
     this.classList.add('spinning');
     refreshMapStyle();
-    state.map?.invalidateSize();
+    if (state.map) state.map.invalidateSize();
     lanes.renderMarkers();
     lanes.hideCard();
     setTimeout(() => this.classList.remove('spinning'), 900);
@@ -193,9 +210,9 @@ function wireHeaderActions() {
   document.getElementById('btScanBtn')?.addEventListener('click', scanBluetooth);
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 //  MAP
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 function getMapStyle() {
   const pref = storage.raw('map-style', 'bright');
   if (pref === 'dark') return CFG.MAP_STYLE_DARK || 'https://tiles.openfreemap.org/styles/dark';
@@ -205,67 +222,85 @@ function getMapStyle() {
 function initMap() {
   if (state.map) return;
   const center = CFG.DEFAULT_CENTER || { lat: 12.9716, lng: 77.5946 };
+
   state.map = L.map('map', {
-    zoomControl: false, attributionControl: false,
-    center: [center.lat, center.lng], zoom: CFG.DEFAULT_ZOOM || 12,
+    zoomControl: false,
+    attributionControl: false,
+    center: [center.lat, center.lng],
+    zoom: CFG.DEFAULT_ZOOM || 13,
   });
+
   try {
     state.mapLibreLayer = L.maplibreGL({ style: getMapStyle(), interactive: false }).addTo(state.map);
-  } catch {
+  } catch (e) {
+    console.warn('MapLibre failed, falling back to OSM tiles:', e);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(state.map);
   }
+
+  setTimeout(() => state.map && state.map.invalidateSize(), 100);
   lanes.renderMarkers();
 }
 
 function refreshMapStyle() {
   if (!state.map) return;
-  if (state.mapLibreLayer) { try { state.map.removeLayer(state.mapLibreLayer); } catch {} }
+  if (state.mapLibreLayer) { try { state.map.removeLayer(state.mapLibreLayer); } catch (e) {} }
   state.mapLibreLayer = L.maplibreGL({ style: getMapStyle(), interactive: false }).addTo(state.map);
   state.mapLibreLayer.bringToBack();
 }
 
 function placeUserMarker(lat, lng) {
+  if (!state.map) return;
   if (state.userMarker) state.map.removeLayer(state.userMarker);
   state.userMarker = L.marker([lat, lng], {
-    icon: L.divIcon({ className: '', html: '<div class="user-marker-wrap"></div>', iconSize: [22, 22], iconAnchor: [11, 11] }),
+    icon: L.divIcon({
+      className: '',
+      html: '<div class="user-marker-wrap"></div>',
+      iconSize: [22, 22],
+      iconAnchor: [11, 11],
+    }),
   }).addTo(state.map);
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 //  GEOLOCATION
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 function startGeolocation() {
-  if (!navigator.geolocation) {
+  const fallback = () => {
     setText('locText', 'Bengaluru, Karnataka');
     reverseGeocode(12.9716, 77.5946);
+    if (state.map) {
+      state.map.setView([12.9716, 77.5946], 13);
+      setTimeout(() => state.map.invalidateSize(), 100);
+    }
     finishGeolocation(12.9716, 77.5946);
-    return;
-  }
+  };
+
+  if (!navigator.geolocation) { fallback(); return; }
+
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       const { latitude, longitude } = pos.coords;
       state.userLat = latitude;
       state.userLng = longitude;
-      state.map.setView([latitude, longitude], 13);
+      if (state.map) {
+        state.map.setView([latitude, longitude], 14);
+        setTimeout(() => state.map.invalidateSize(), 100);
+      }
       placeUserMarker(latitude, longitude);
       reverseGeocode(latitude, longitude);
       finishGeolocation(latitude, longitude);
     },
-    () => {
-      setText('locText', 'Bengaluru, Karnataka');
-      reverseGeocode(12.9716, 77.5946);
-      finishGeolocation(12.9716, 77.5946);
-    },
-    { enableHighAccuracy: true, timeout: 8000 }
+    fallback,
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
   );
 }
 
 function finishGeolocation(lat, lng) {
-  presence.joinMesh(lat, lng).catch(e => console.warn('Mesh join failed:', e));
+  try { presence.joinMesh(lat, lng); } catch (e) { console.warn('Mesh join:', e); }
 }
 
 function reverseGeocode(lat, lng) {
-  fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14`, {
+  fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=14', {
     headers: { 'Accept': 'application/json' },
   })
     .then(r => r.json())
@@ -279,59 +314,94 @@ function reverseGeocode(lat, lng) {
     .catch(() => setText('locText', 'Bengaluru, Karnataka'));
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 //  TABS
-// ═══════════════════════════════════════════════════════════════
-function wireNav() {
+// ============================================================
+function wireTabs() {
   document.querySelectorAll('.nav-item').forEach(btn => {
     btn.addEventListener('click', () => {
       const tab = btn.dataset.tab;
       state.currentTab = tab;
+
       document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b === btn));
       document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === tab + 'View'));
+
       updateFab();
       lanes.hideCard();
-      if (tab === 'pulse' && state.map) setTimeout(() => state.map.invalidateSize(), 150);
+
+      // Re-render each tab when its shown
+      if (tab === 'pulse') {
+        setTimeout(() => {
+          if (state.map) state.map.invalidateSize();
+        }, 150);
+      } else if (tab === 'lanes') {
+        try { lanes.render(); } catch (e) {}
+      } else if (tab === 'near') {
+        try { if (presence.renderNear) presence.renderNear(); } catch (e) {}
+      } else if (tab === 'hive') {
+        try { hive.render(); } catch (e) {}
+      }
     });
   });
+}
+
+function switchTab(tab) {
+  const btn = document.querySelector('.nav-item[data-tab="' + tab + '"]');
+  if (btn) btn.click();
 }
 
 function updateFab() {
   const label = document.getElementById('fabLabel');
   const sub = document.getElementById('fabSub');
   if (!label || !sub) return;
+
   if (state.currentTab === 'pulse' || state.currentTab === 'lanes') {
-    label.textContent = 'Post my lane'; sub.textContent = 'Share seats & route';
+    label.textContent = 'Post my lane';
+    sub.textContent = 'Share seats and route';
   } else if (state.currentTab === 'near') {
-    label.textContent = 'Broadcast local'; sub.textContent = 'Message nearby drivers';
+    label.textContent = 'Broadcast local';
+    sub.textContent = 'Message nearby drivers';
   } else {
-    label.textContent = 'New post'; sub.textContent = 'Share with the community';
+    label.textContent = 'New post';
+    sub.textContent = 'Share with the community';
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
+function wireFilterChips() {
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c === chip));
+      state.selectedFilter = chip.dataset.filter;
+      try { lanes.render(); } catch (e) {}
+      try { lanes.renderMarkers(); } catch (e) {}
+    });
+  });
+}
+
+// ============================================================
 //  FAB
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 function wireFab() {
   document.getElementById('fabBtn')?.addEventListener('click', async () => {
     if (state.currentTab === 'pulse' || state.currentTab === 'lanes') {
-      lanes.openPost();
+      try { lanes.openPost(); } catch (e) { showToast('Could not open post modal', 'error'); }
     } else if (state.currentTab === 'near') {
       const sent = presence.broadcast({
         type: 'chat',
-        text: state.userName + ' is now visible nearby 👋',
+        text: state.userName + ' is now visible nearby',
         sender: state.userName,
       });
-      showToast(sent ? `Broadcast to ${sent} neighbour${sent === 1 ? '' : 's'}` : 'You are visible nearby ✓', 'success');
+      showToast(sent ? 'Broadcast to ' + sent + ' neighbour' + (sent === 1 ? '' : 's') : 'You are visible nearby',
+                'success');
     } else {
-      hive.openCompose();
+      try { hive.openCompose(); } catch (e) { showToast('Could not open compose', 'error'); }
     }
   });
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 //  TRACK HUD
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 function wireTrackingHud() {
   document.getElementById('trackClose')?.addEventListener('click', () => presence.stopTracking());
 
@@ -341,25 +411,32 @@ function wireTrackingHud() {
     let target = state.lanes.find(l => l.id === id);
     if (!target && id.startsWith('peer-')) {
       const vehicle = id.replace('peer-', '');
-      target = state.cloudPeers.get(vehicle);
+      target = state.cloudPeers && state.cloudPeers.get(vehicle);
     }
     if (!target) return;
+
     const fakeLane = {
       id: 'peer-' + (target.vehicle || target.id),
       driver: target.name || target.driver,
-      avatar: target.avatar, phone: target.phone, vehicle: target.vehicle,
-      vehicleType: target.vehicleType, peerId: target.peerId, mine: false,
+      avatar: target.avatar,
+      phone: target.phone,
+      vehicle: target.vehicle,
+      vehicleType: target.vehicleType,
+      peerId: target.peerId,
+      mine: false,
       route: { from: '', via: [], to: 'Direct chat' },
       seats: { total: 0, taken: 0 },
     };
-    chat.openLane(fakeLane);
+    try { chat.openLane(fakeLane); } catch (e) {}
   });
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 //  THEME
-// ═══════════════════════════════════════════════════════════════
-function loadTheme() { applyTheme(storage.raw('theme', 'light')); }
+// ============================================================
+function loadTheme() {
+  applyTheme(storage.raw('theme', 'light'));
+}
 
 function applyTheme(mode) {
   const resolved = mode === 'auto'
@@ -371,9 +448,9 @@ function applyTheme(mode) {
   if (meta) meta.setAttribute('content', resolved === 'dark' ? '#0A0B0E' : '#FFFFFF');
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 //  SETTINGS
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 function wireSettings() {
   document.getElementById('settingsSave')?.addEventListener('click', saveSettings);
 
@@ -393,23 +470,23 @@ function wireSettings() {
   });
 
   document.getElementById('cloudTest')?.addEventListener('click', async () => {
-    setCloudStatus('Testing…');
+    setCloudStatus('Testing...');
     const ok = await api.ping();
     if (ok) {
       const dbg = await api.debug();
-      setCloudStatus('✓ Connected · ' + (dbg?.lanes ?? 0) + ' lanes, ' + (dbg?.hive ?? 0) + ' posts', 'ok');
+      setCloudStatus('Connected - ' + (dbg && dbg.lanes ? dbg.lanes : 0) + ' lanes, ' + (dbg && dbg.hive ? dbg.hive : 0) + ' posts', 'ok');
     } else {
-      setCloudStatus('✗ ' + (api.lastError || 'failed'), 'err');
+      setCloudStatus('Failed - ' + (api.lastError || 'unknown'), 'err');
     }
   });
 
   document.getElementById('setClearLanes')?.addEventListener('click', async () => {
     if (!confirm('Delete all your published lanes on this device?')) return;
     const mine = state.lanes.filter(l => l.mine);
-    for (const l of mine) { try { await api.removeLane(l.id); } catch {} }
+    for (const l of mine) { try { await api.removeLane(l.id); } catch (e) {} }
     state.lanes = state.lanes.filter(l => !l.mine);
     saveLanes();
-    lanes.render(); lanes.renderMarkers();
+    try { lanes.render(); lanes.renderMarkers(); } catch (e) {}
     showToast('Your lanes cleared', 'success');
   });
 
@@ -423,6 +500,7 @@ function wireSettings() {
     document.getElementById('settingsModal')?.classList.remove('active');
     openAuthSheet(session.isLoggedIn() ? 'login' : 'register');
   });
+
   document.getElementById('authLogoutBtn')?.addEventListener('click', async () => {
     await logout();
     updateAvatar();
@@ -454,8 +532,11 @@ function openSettings() {
   set('setCloudUrl', api.url);
   set('setCloudKey', api.key);
 
-  if (api.url) setCloudStatus(state.cloudOnline ? 'Cloud sync on' : ('✗ ' + (state.cloudLastError || 'offline')), state.cloudOnline ? 'ok' : 'err');
-  else setCloudStatus('Not configured', 'err');
+  if (api.url) {
+    setCloudStatus(state.cloudOnline ? 'Cloud sync on' : ('Offline - ' + (state.cloudLastError || '')), state.cloudOnline ? 'ok' : 'err');
+  } else {
+    setCloudStatus('Not configured', 'err');
+  }
 
   document.getElementById('settingsModal')?.classList.add('active');
 }
@@ -508,11 +589,14 @@ function setCloudStatus(text, variant) {
   el.className = 'cloud-status' + (variant ? ' ' + variant : '');
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 //  CLOUD POLLING
-// ═══════════════════════════════════════════════════════════════
-async function syncAll(silent = true) {
-  await Promise.all([lanes.syncFromCloud(), hive.syncFromCloud()]);
+// ============================================================
+async function syncAll(silent) {
+  await Promise.all([
+    lanes.syncFromCloud().catch(() => {}),
+    hive.syncFromCloud().catch(() => {}),
+  ]);
 }
 
 function startCloudPolling() {
@@ -522,14 +606,14 @@ function startCloudPolling() {
   setTimer('cloudPoll', () => syncAll(true), interval);
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 //  BLUETOOTH
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 async function scanBluetooth() {
   if (!navigator.bluetooth) { showToast('Web Bluetooth not supported', 'error'); return; }
   const btn = document.getElementById('btScanBtn');
   if (!btn) return;
-  btn.disabled = true; btn.textContent = 'Scanning…';
+  btn.disabled = true; btn.textContent = 'Scanning...';
   try {
     const device = await navigator.bluetooth.requestDevice({
       acceptAllDevices: true,
@@ -537,8 +621,11 @@ async function scanBluetooth() {
     });
     if (!state.btDevices.find(d => d.id === device.id)) {
       state.btDevices.push({
-        id: device.id, name: device.name || 'Unknown device',
-        connected: false, rssi: -Math.floor(40 + Math.random() * 50), device,
+        id: device.id,
+        name: device.name || 'Unknown device',
+        connected: false,
+        rssi: -Math.floor(40 + Math.random() * 50),
+        device,
       });
     }
     renderBluetooth();
@@ -548,16 +635,12 @@ async function scanBluetooth() {
       const entry = state.btDevices.find(d => d.id === device.id);
       if (entry) entry.connected = true;
       renderBluetooth();
-      device.addEventListener('gattserverdisconnected', () => {
-        const e = state.btDevices.find(d => d.id === device.id);
-        if (e) e.connected = false;
-        renderBluetooth();
-      });
-    } catch {}
+    } catch (e) {}
   } catch (err) {
     if (err.name !== 'NotFoundError') showToast('Bluetooth scan failed', 'error');
   } finally {
-    btn.disabled = false; btn.textContent = 'Scan';
+    btn.disabled = false;
+    btn.textContent = 'Scan';
   }
 }
 
@@ -568,16 +651,17 @@ function renderBluetooth() {
     wrap.innerHTML = '<div class="bt-empty">Tap Scan to discover nearby Bluetooth devices</div>';
     return;
   }
-  wrap.innerHTML = state.btDevices.map(d => `
-    <div class="bt-device" data-id="${d.id}">
-      <div class="bt-icon">${d.connected ? '🔗' : '📶'}</div>
-      <div class="bt-info">
-        <div class="bt-name">${escapeHtml(d.name)}</div>
-        <div class="bt-meta">${d.connected ? 'Connected' : 'RSSI ' + d.rssi + ' dBm'}</div>
-      </div>
-      <button class="bt-action" data-action="toggle">${d.connected ? 'Drop' : 'Connect'}</button>
-    </div>
-  `).join('');
+  wrap.innerHTML = state.btDevices.map(d => (
+    '<div class="bt-device" data-id="' + d.id + '">' +
+      '<div class="bt-icon">' + (d.connected ? '🔗' : '📶') + '</div>' +
+      '<div class="bt-info">' +
+        '<div class="bt-name">' + escapeHtml(d.name) + '</div>' +
+        '<div class="bt-meta">' + (d.connected ? 'Connected' : 'RSSI ' + d.rssi + ' dBm') + '</div>' +
+      '</div>' +
+      '<button class="bt-action" data-action="toggle">' + (d.connected ? 'Drop' : 'Connect') + '</button>' +
+    '</div>'
+  )).join('');
+
   wrap.querySelectorAll('[data-action="toggle"]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const dev = state.btDevices.find(d => d.id === btn.closest('.bt-device').dataset.id);
@@ -586,36 +670,39 @@ function renderBluetooth() {
         if (dev.connected) { dev.device.gatt.disconnect(); dev.connected = false; }
         else { await dev.device.gatt.connect(); dev.connected = true; }
         renderBluetooth();
-      } catch { showToast('Bluetooth action failed', 'error'); }
+      } catch (e) { showToast('Bluetooth action failed', 'error'); }
     });
   });
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 //  PEERJS
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 function initPeer() {
   if (typeof Peer === 'undefined') { console.warn('PeerJS not loaded'); return; }
   const id = 'steeradar-veh-' + state.vehicle;
   state.peerId = id;
-  try { state.peer = new Peer(id, { debug: 0 }); } catch (e) { console.warn('Peer init failed:', e); return; }
+  try { state.peer = new Peer(id, { debug: 0 }); }
+  catch (e) { console.warn('Peer init failed:', e); return; }
 
   state.peer.on('open', () => {
     setConnBadge(true, 'Online');
-    try { presence.start(); } catch {}
+    try { presence.start(); } catch (e) {}
   });
+
   state.peer.on('connection', (conn) => {
     conn.on('open', () => {
       state.connections.set(conn.peer, conn);
       attachPeerHandlers(conn);
     });
   });
+
   state.peer.on('error', (err) => {
     if (err.type === 'unavailable-id') {
-      try { state.peer.destroy(); } catch {}
+      try { state.peer.destroy(); } catch (e) {}
       const newId = id + '-' + Math.random().toString(36).slice(2, 6);
       state.peerId = newId;
-      try { state.peer = new Peer(newId, { debug: 0 }); } catch { return; }
+      try { state.peer = new Peer(newId, { debug: 0 }); } catch (e) { return; }
       state.peer.on('open', () => setConnBadge(true, 'Online'));
       state.peer.on('connection', (c) => {
         c.on('open', () => { state.connections.set(c.peer, c); attachPeerHandlers(c); });
@@ -624,9 +711,10 @@ function initPeer() {
       setConnBadge(false, 'Connection issue');
     }
   });
+
   state.peer.on('disconnected', () => {
-    setConnBadge(false, 'Reconnecting…');
-    setTimeout(() => { try { state.peer.reconnect(); } catch {} }, 2000);
+    setConnBadge(false, 'Reconnecting...');
+    setTimeout(() => { try { state.peer.reconnect(); } catch (e) {} }, 2000);
   });
 }
 
@@ -634,12 +722,12 @@ function attachPeerHandlers(conn) {
   conn.on('data', (data) => {
     if (!data || typeof data !== 'object') return;
     if (data.type === 'chat') {
-      try { chat.receive(data.text, data.sender, chat.activeRoomId); } catch {}
+      try { chat.receive(data.text, data.sender, chat.activeRoomId); } catch (e) {}
     } else if (data.type === 'hive-post') {
       if (!state.hivePosts.find(p => p.id === data.post.id)) {
         state.hivePosts.push(data.post);
         saveHive();
-        hive.render();
+        try { hive.render(); } catch (e) {}
       }
     }
   });
@@ -651,18 +739,17 @@ function setConnBadge(online, text) {
   if (!el) return;
   el.classList.toggle('online', !!online);
   el.classList.toggle('offline', !online);
-  el.innerHTML = `<span class="dot"></span> ${escapeHtml(text)}`;
+  el.innerHTML = '<span class="dot"></span> ' + escapeHtml(text);
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 //  LOG VIEWER
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 function wireLogViewer() {
   document.getElementById('logCopy')?.addEventListener('click', () => logger.export());
   document.getElementById('logClear')?.addEventListener('click', () => logger.clear());
   document.getElementById('logRefresh')?.addEventListener('click', () => logger.render());
 
-  // Long-press on logo (600ms) opens the log
   const logo = document.getElementById('logoTrigger');
   if (logo) {
     let holdTimer = null;
@@ -686,11 +773,12 @@ function wireLogViewer() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  DEV MODE — 5 taps on the version line
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
+//  DEV MODE
+// ============================================================
 let _devTaps = 0;
 let _devTimer = null;
+
 function wireDevMode() {
   const tapTarget = document.getElementById('versionTap');
   if (!tapTarget) return;
@@ -703,7 +791,7 @@ function wireDevMode() {
     if (_devTaps >= 5) {
       _devTaps = 0;
       const block = document.getElementById('devModeBlock');
-      const hint  = document.getElementById('devModeHint');
+      const hint = document.getElementById('devModeHint');
       if (block) {
         const shown = block.style.display === 'block';
         block.style.display = shown ? 'none' : 'block';
@@ -720,14 +808,14 @@ function wireDevMode() {
     storage.setRaw('cloud-key', key);
     api.url = url;
     api.key = key;
-    showToast('Endpoint saved · reloading', 'success');
+    showToast('Endpoint saved - reloading', 'success');
     setTimeout(() => location.reload(), 600);
   });
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 //  UTILS
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 function setText(id, value) {
   const el = document.getElementById(id);
   if (el) el.textContent = value;
@@ -739,12 +827,25 @@ function escapeHtml(s) {
   }[c]));
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 //  BOOTSTRAP
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 function main() {
-  boot();
-  if (state.vehicle) initPeer();
+  // Listen for the inline boot unlock event
+  window.addEventListener('steeradar:unlock', () => {
+    console.log('[Steeradar] Unlock event received');
+    boot();
+    if (state.vehicle) initPeer();
+  });
+
+  // Also try booting immediately (in case inline already unlocked)
+  const saved = storage.raw('vehicle', '');
+  if (saved && validateVehicle(saved)) {
+    setTimeout(() => {
+      boot();
+      if (state.vehicle) initPeer();
+    }, 100);
+  }
 }
 
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
@@ -754,6 +855,10 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
 }
 
 window.SteeradarApp = {
-  boot, unlockApp, syncAll, openSettings,
+  boot: boot,
+  unlockApp: unlockApp,
+  syncAll: syncAll,
+  openSettings: openSettings,
+  switchTab: switchTab,
   getState: () => state,
 };
