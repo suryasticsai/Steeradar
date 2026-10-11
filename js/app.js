@@ -85,14 +85,14 @@ function unlockApp() {
     document.getElementById('onboardGate')?.classList.add('gate-hidden');
 
     // Load from local storage
-    lanes.loadFromStorage();
-    hive.loadFromStorage();
+    try { lanes.loadFromStorage(); } catch (e) { console.warn(e); }
+    try { hive.loadFromStorage(); } catch (e) { console.warn(e); }
 
     // Init logger first so it captures everything
-    logger.init();
+    try { logger.init(); } catch (e) { console.warn(e); }
     initModalCloseButtons();
 
-    // Init feature modules
+    // Init feature modules - each wrapped so one failure doesn't kill the app
     try { lanes.init(); } catch (e) { console.warn('lanes.init:', e); }
     try { hive.init(); } catch (e) { console.warn('hive.init:', e); }
     try { chat.init(); } catch (e) { console.warn('chat.init:', e); }
@@ -113,11 +113,12 @@ function unlockApp() {
     loadTheme();
 
     initMap();
-    // Delay geolocation slightly so map container has real dimensions
+
+    // Delay geolocation so map container has real dimensions
     setTimeout(() => {
       if (state.map) {
-        state.map.invalidateSize();
-        lanes.renderMarkers();
+        try { state.map.invalidateSize(); } catch (e) {}
+        try { lanes.renderMarkers(); } catch (e) {}
       }
       startGeolocation();
     }, 250);
@@ -130,11 +131,12 @@ function unlockApp() {
     }).catch(() => {});
 
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) clearTimer('cloudPoll');
-      else {
+      if (document.hidden) {
+        clearTimer('cloudPoll');
+      } else {
         startCloudPolling();
         syncAll(true);
-        if (state.map) setTimeout(() => state.map.invalidateSize(), 100);
+        if (state.map) setTimeout(() => { try { state.map.invalidateSize(); } catch (e) {} }, 100);
       }
     });
 
@@ -200,8 +202,8 @@ function wireHeaderActions() {
   document.getElementById('mapRefresh')?.addEventListener('click', function () {
     this.classList.add('spinning');
     refreshMapStyle();
-    if (state.map) state.map.invalidateSize();
-    lanes.renderMarkers();
+    if (state.map) try { state.map.invalidateSize(); } catch (e) {}
+    try { lanes.renderMarkers(); } catch (e) {}
     lanes.hideCard();
     setTimeout(() => this.classList.remove('spinning'), 900);
     showToast('Map refreshed', 'success');
@@ -230,27 +232,49 @@ function initMap() {
     zoom: CFG.DEFAULT_ZOOM || 13,
   });
 
+  // Try MapLibre GL vector tiles, fall back to OSM raster
   try {
     state.mapLibreLayer = L.maplibreGL({ style: getMapStyle(), interactive: false }).addTo(state.map);
   } catch (e) {
     console.warn('MapLibre failed, falling back to OSM tiles:', e);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(state.map);
+    try {
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(state.map);
+    } catch (e2) { console.error('Fallback tiles also failed:', e2); }
   }
 
-  setTimeout(() => state.map && state.map.invalidateSize(), 100);
-  lanes.renderMarkers();
+  setTimeout(() => { try { state.map.invalidateSize(); } catch (e) {} }, 100);
+  try { lanes.renderMarkers(); } catch (e) {}
 }
 
 function refreshMapStyle() {
   if (!state.map) return;
-  if (state.mapLibreLayer) { try { state.map.removeLayer(state.mapLibreLayer); } catch (e) {} }
-  state.mapLibreLayer = L.maplibreGL({ style: getMapStyle(), interactive: false }).addTo(state.map);
-  state.mapLibreLayer.bringToBack();
+
+  // Remove old layer
+  if (state.mapLibreLayer) {
+    try { state.map.removeLayer(state.mapLibreLayer); } catch (e) {}
+  }
+
+  // Add new layer with safety guards
+  try {
+    state.mapLibreLayer = L.maplibreGL({ style: getMapStyle(), interactive: false }).addTo(state.map);
+
+    // NOTE: bringToBack() is NOT supported by maplibre-gl-leaflet; guard just in case
+    if (state.mapLibreLayer && typeof state.mapLibreLayer.bringToBack === 'function') {
+      state.mapLibreLayer.bringToBack();
+    }
+  } catch (e) {
+    console.warn('MapLibre refresh failed, falling back:', e);
+    try {
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(state.map);
+    } catch (e2) {}
+  }
 }
 
 function placeUserMarker(lat, lng) {
   if (!state.map) return;
-  if (state.userMarker) state.map.removeLayer(state.userMarker);
+  if (state.userMarker) {
+    try { state.map.removeLayer(state.userMarker); } catch (e) {}
+  }
   state.userMarker = L.marker([lat, lng], {
     icon: L.divIcon({
       className: '',
@@ -270,7 +294,7 @@ function startGeolocation() {
     reverseGeocode(12.9716, 77.5946);
     if (state.map) {
       state.map.setView([12.9716, 77.5946], 13);
-      setTimeout(() => state.map.invalidateSize(), 100);
+      setTimeout(() => { try { state.map.invalidateSize(); } catch (e) {} }, 100);
     }
     finishGeolocation(12.9716, 77.5946);
   };
@@ -284,7 +308,7 @@ function startGeolocation() {
       state.userLng = longitude;
       if (state.map) {
         state.map.setView([latitude, longitude], 14);
-        setTimeout(() => state.map.invalidateSize(), 100);
+        setTimeout(() => { try { state.map.invalidateSize(); } catch (e) {} }, 100);
       }
       placeUserMarker(latitude, longitude);
       reverseGeocode(latitude, longitude);
@@ -327,17 +351,14 @@ function wireTabs() {
       document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === tab + 'View'));
 
       updateFab();
-      lanes.hideCard();
+      try { lanes.hideCard(); } catch (e) {}
 
-      // Re-render each tab when its shown
       if (tab === 'pulse') {
-        setTimeout(() => {
-          if (state.map) state.map.invalidateSize();
-        }, 150);
+        setTimeout(() => { if (state.map) try { state.map.invalidateSize(); } catch (e) {} }, 150);
       } else if (tab === 'lanes') {
         try { lanes.render(); } catch (e) {}
       } else if (tab === 'near') {
-        try { if (presence.renderNear) presence.renderNear(); } catch (e) {}
+        try { presence.renderNear(); } catch (e) {}
       } else if (tab === 'hive') {
         try { hive.render(); } catch (e) {}
       }
@@ -403,13 +424,15 @@ function wireFab() {
 //  TRACK HUD
 // ============================================================
 function wireTrackingHud() {
-  document.getElementById('trackClose')?.addEventListener('click', () => presence.stopTracking());
+  document.getElementById('trackClose')?.addEventListener('click', () => {
+    try { presence.stopTracking(); } catch (e) {}
+  });
 
   document.getElementById('trackChat')?.addEventListener('click', () => {
     const id = state.trackedLaneId;
     if (!id) return;
     let target = state.lanes.find(l => l.id === id);
-    if (!target && id.startsWith('peer-')) {
+    if (!target && id.indexOf('peer-') === 0) {
       const vehicle = id.replace('peer-', '');
       target = state.cloudPeers && state.cloudPeers.get(vehicle);
     }
@@ -492,7 +515,7 @@ function wireSettings() {
 
   document.getElementById('setResetAll')?.addEventListener('click', () => {
     if (!confirm('Reset everything? You will see onboarding again.')) return;
-    Object.keys(localStorage).filter(k => k.startsWith('steeradar-')).forEach(k => localStorage.removeItem(k));
+    Object.keys(localStorage).filter(k => k.indexOf('steeradar-') === 0).forEach(k => localStorage.removeItem(k));
     location.reload();
   });
 
@@ -593,10 +616,8 @@ function setCloudStatus(text, variant) {
 //  CLOUD POLLING
 // ============================================================
 async function syncAll(silent) {
-  await Promise.all([
-    lanes.syncFromCloud().catch(() => {}),
-    hive.syncFromCloud().catch(() => {}),
-  ]);
+  try { await lanes.syncFromCloud(); } catch (e) {}
+  try { await hive.syncFromCloud(); } catch (e) {}
 }
 
 function startCloudPolling() {
