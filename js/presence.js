@@ -1,9 +1,4 @@
-// js/presence.js — Live tracking + geohash local mesh.
-// Two responsibilities:
-//   1. Broadcast your position to the cloud every 20s; render every
-//      other vehicle's position as a live marker on the map.
-//   2. Join a geohash-based PeerJS room so people within ~1 km
-//      discover each other without any server.
+// js/presence.js - Live tracking + geohash local mesh
 
 import { api } from './api.js';
 import {
@@ -16,14 +11,15 @@ const CFG = window.STEERADAR || {};
 
 // ─── LOCAL STATE ───
 let presenceRunning = false;
-let liveMarkers = new Map();     // vehicle -> { marker, prevLat, prevLng }
+let liveMarkers = new Map();
 let routeLayer = null;
 let routeGlowLayer = null;
 let pickupMarker = null;
 let vehiclePin = null;
 let routeData = null;
 let trackingTargetId = null;
-let onPeerMessage = null;        // callback registered by chat.js
+let onPeerMessage = null;
+let localRescanTimer = null;
 
 // ============================================================
 //  PRESENCE HEARTBEAT
@@ -32,7 +28,6 @@ export async function startPresence() {
   if (presenceRunning) return;
   presenceRunning = true;
 
-  // Immediate first beat, then every 20s
   await presenceBeat();
   setTimer('presence', presenceBeat, CFG.PRESENCE_INTERVAL_MS || 20000);
 }
@@ -40,7 +35,6 @@ export async function startPresence() {
 export function stopPresence() {
   presenceRunning = false;
   clearTimer('presence');
-  clearTimer('liveRefresh');
 }
 
 async function presenceBeat() {
@@ -48,7 +42,7 @@ async function presenceBeat() {
 
   const hidden = storage.raw('ghost', '') === 'true';
   if (hidden) {
-    try { await api.removePresence(state.vehicle); } catch {}
+    try { await api.removePresence(state.vehicle); } catch (e) {}
     return;
   }
 
@@ -66,7 +60,7 @@ async function presenceBeat() {
     row.lng = state.userLng;
   }
 
-  try { await api.updatePresence(row); } catch {}
+  try { await api.updatePresence(row); } catch (e) {}
   await refreshActiveVehicles();
 }
 
@@ -80,7 +74,6 @@ async function refreshActiveVehicles() {
     others.set(v.vehicle, v);
   });
   state.cloudPeers = others;
-
   renderLiveVehicles();
 }
 
@@ -90,15 +83,13 @@ async function refreshActiveVehicles() {
 function renderLiveVehicles() {
   if (!state.map) return;
 
-  // Remove markers that are no longer present
   liveMarkers.forEach((entry, vehicle) => {
     if (!state.cloudPeers.has(vehicle)) {
-      try { state.map.removeLayer(entry.marker); } catch {}
+      try { state.map.removeLayer(entry.marker); } catch (e) {}
       liveMarkers.delete(vehicle);
     }
   });
 
-  // Add or update
   state.cloudPeers.forEach((v, vehicle) => {
     if (v.lat == null || v.lng == null) return;
     const vt = getVehicleType(v.vehicleType || 'car');
@@ -106,23 +97,21 @@ function renderLiveVehicles() {
 
     if (existing) {
       animateMarkerTo(existing.marker, v.lat, v.lng, 1200);
-      existing.prevLat = v.lat;
-      existing.prevLng = v.lng;
     } else {
       const icon = L.divIcon({
         className: '',
-        html: `
-          <div class="live-vehicle-marker">
-            <div class="lv-trail"></div>
-            <div class="lv-core">${vt.emoji}</div>
-          </div>`,
+        html:
+          '<div class="live-vehicle-marker">' +
+            '<div class="lv-trail"></div>' +
+            '<div class="lv-core">' + vt.emoji + '</div>' +
+          '</div>',
         iconSize: [60, 60],
         iconAnchor: [30, 30],
       });
       const marker = L.marker([v.lat, v.lng], { icon }).addTo(state.map);
-      marker.bindPopup(`<b>${escapeHtml(v.name)}</b><br>${vt.emoji} ${vt.label}`);
+      marker.bindPopup('<b>' + escapeHtml(v.name) + '</b><br>' + vt.emoji + ' ' + vt.label);
       marker.on('click', () => showVehicleCard(v));
-      liveMarkers.set(vehicle, { marker, prevLat: v.lat, prevLng: v.lng });
+      liveMarkers.set(vehicle, { marker });
     }
   });
 }
@@ -152,16 +141,15 @@ function showVehicleCard(v) {
     ? distanceM({ lat: state.userLat, lng: state.userLng }, { lat: v.lat, lng: v.lng })
     : null;
 
-  card.innerHTML = `
-    <button class="close-x" id="mapCardClose">✕</button>
-    <div class="vtype-badge">${vt.emoji} ${vt.label}</div>
-    <h3>${escapeHtml(v.name)}</h3>
-    <div class="route">${dist != null ? fmtDist(dist) + ' away · live now' : 'Live now'}</div>
-    <div class="actions">
-      <button class="btn-request" style="flex:1;background:var(--surface-2);color:var(--text);box-shadow:none;border:1px solid var(--border)" id="liveChatBtn">💬</button>
-      <button class="btn-request" style="flex:1" id="liveTrackBtn">📍 Track live</button>
-    </div>
-  `;
+  card.innerHTML =
+    '<button class="close-x" id="mapCardClose">✕</button>' +
+    '<div class="vtype-badge">' + vt.emoji + ' ' + vt.label + '</div>' +
+    '<h3>' + escapeHtml(v.name) + '</h3>' +
+    '<div class="route">' + (dist != null ? fmtDist(dist) + ' away - live now' : 'Live now') + '</div>' +
+    '<div class="actions">' +
+      '<button class="btn-request" style="flex:1;background:var(--surface-2);color:var(--text);border:1px solid var(--border)" id="liveChatBtn">💬 Chat</button>' +
+      '<button class="btn-request" style="flex:1" id="liveTrackBtn">📍 Track live</button>' +
+    '</div>';
   card.classList.add('show');
 
   document.getElementById('mapCardClose').onclick = () => card.classList.remove('show');
@@ -179,7 +167,9 @@ function showVehicleCard(v) {
       route: { from: '', via: [], to: 'Direct chat' },
       seats: { total: 0, taken: 0 },
     };
-    if (window.Steeradar?.chat) window.Steeradar.chat.openLane(fakeLane);
+    if (window.Steeradar && window.Steeradar.chat) {
+      window.Steeradar.chat.openLane(fakeLane);
+    }
   };
   document.getElementById('liveTrackBtn').onclick = () => {
     card.classList.remove('show');
@@ -188,7 +178,7 @@ function showVehicleCard(v) {
 }
 
 // ============================================================
-//  ZOMATO-STYLE ROUTE TRACKING
+//  ROUTE TRACKING (Zomato-style)
 // ============================================================
 export async function startRouteTracking(target) {
   stopRouteTracking();
@@ -200,7 +190,6 @@ export async function startRouteTracking(target) {
   const pickup = { lat: state.userLat, lng: state.userLng };
   trackingTargetId = target.id || ('peer-' + target.vehicle);
 
-  // HUD
   const vt = getVehicleType(target.vehicleType || 'car');
   const avatarEl = document.getElementById('trackAvatar');
   if (avatarEl) {
@@ -208,28 +197,28 @@ export async function startRouteTracking(target) {
     avatarEl.style.background = vt.color || 'var(--teal)';
   }
   setText('trackName', target.name || target.driver || 'Vehicle');
-  document.getElementById('trackMeta').innerHTML =
-    `<span class="live-dot"></span> ${vt.emoji} ${vt.label} · coming to you`;
+  const metaEl = document.getElementById('trackMeta');
+  if (metaEl) metaEl.innerHTML = '<span class="live-dot"></span> ' + vt.emoji + ' ' + vt.label + ' - coming to you';
 
   document.getElementById('trackHud')?.classList.add('show');
 
-  // Switch to map
-  document.querySelector('[data-tab="pulse"]')?.click();
-  setTimeout(() => state.map?.invalidateSize(), 200);
+  // Switch to pulse tab
+  const pulseTab = document.querySelector('.nav-item[data-tab="pulse"]');
+  if (pulseTab) pulseTab.click();
+  setTimeout(() => state.map && state.map.invalidateSize(), 200);
 
-  // Fit bounds
-  const bounds = L.latLngBounds([
-    [pickup.lat, pickup.lng],
-    [target.lat, target.lng],
-  ]);
-  state.map.fitBounds(bounds, { padding: [80, 80] });
+  if (state.map) {
+    const bounds = L.latLngBounds([
+      [pickup.lat, pickup.lng],
+      [target.lat, target.lng],
+    ]);
+    state.map.fitBounds(bounds, { padding: [80, 80] });
+  }
 
   drawPickup(pickup);
   drawVehiclePin(target);
-
   await refreshRoute(pickup, target);
 
-  // Refresh route every 8s (vehicle moves → path recalculates)
   setTimer('routeRefresh', async () => {
     const cur = findTrackedTarget();
     if (!cur || cur.lat == null) return;
@@ -238,7 +227,6 @@ export async function startRouteTracking(target) {
     updateTrackStats(cur, pickup);
   }, 8000);
 
-  // Update stats every second
   setTimer('trackTick', () => {
     const cur = findTrackedTarget();
     if (cur) updateTrackStats(cur, pickup);
@@ -249,8 +237,8 @@ function findTrackedTarget() {
   if (!trackingTargetId) return null;
   let t = state.lanes.find(l => l.id === trackingTargetId);
   if (!t && trackingTargetId.startsWith('peer-')) {
-    const p = state.cloudPeers.get(trackingTargetId.replace('peer-', ''));
-    if (p) t = { ...p, id: trackingTargetId };
+    const p = state.cloudPeers && state.cloudPeers.get(trackingTargetId.replace('peer-', ''));
+    if (p) t = Object.assign({}, p, { id: trackingTargetId });
   }
   return t;
 }
@@ -264,8 +252,8 @@ async function refreshRoute(from, to) {
 }
 
 async function fetchOSRM(from, to) {
-  const url = `https://router.project-osrm.org/route/v1/driving/` +
-    `${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
+  const url = 'https://router.project-osrm.org/route/v1/driving/' +
+    from.lng + ',' + from.lat + ';' + to.lng + ',' + to.lat + '?overview=full&geometries=geojson';
   try {
     const res = await fetch(url);
     const data = await res.json();
@@ -275,7 +263,7 @@ async function fetchOSRM(from, to) {
       distance: data.routes[0].distance,
       duration: data.routes[0].duration,
     };
-  } catch { return null; }
+  } catch (e) { return null; }
 }
 
 function drawRouteLine(coords) {
@@ -295,15 +283,16 @@ function drawRouteLine(coords) {
 }
 
 function drawPickup(pickup) {
-  if (pickupMarker) { try { state.map.removeLayer(pickupMarker); } catch {} }
+  if (!state.map) return;
+  if (pickupMarker) { try { state.map.removeLayer(pickupMarker); } catch (e) {} }
   pickupMarker = L.marker([pickup.lat, pickup.lng], {
     icon: L.divIcon({
       className: '',
-      html: `
-        <div style="position:relative;width:26px;height:26px;">
-          <div style="position:absolute;inset:0;border-radius:50%;background:#DC2626;border:3px solid #fff;box-shadow:0 2px 10px rgba(220,38,38,.5)"></div>
-          <div style="position:absolute;inset:-8px;border-radius:50%;border:2px solid #DC2626;opacity:.4;animation:busPulse 2s ease-out infinite"></div>
-        </div>`,
+      html:
+        '<div style="position:relative;width:26px;height:26px;">' +
+          '<div style="position:absolute;inset:0;border-radius:50%;background:#DC2626;border:3px solid #fff;box-shadow:0 2px 10px rgba(220,38,38,.5)"></div>' +
+          '<div style="position:absolute;inset:-8px;border-radius:50%;border:2px solid #DC2626;opacity:.4;animation:busPulse 2s ease-out infinite"></div>' +
+        '</div>',
       iconSize: [26, 26],
       iconAnchor: [13, 13],
     }),
@@ -312,12 +301,13 @@ function drawPickup(pickup) {
 }
 
 function drawVehiclePin(target) {
-  if (vehiclePin) { try { state.map.removeLayer(vehiclePin); } catch {} }
+  if (!state.map) return;
+  if (vehiclePin) { try { state.map.removeLayer(vehiclePin); } catch (e) {} }
   const vt = getVehicleType(target.vehicleType || 'car');
   vehiclePin = L.marker([target.lat, target.lng], {
     icon: L.divIcon({
       className: '',
-      html: `<div style="width:38px;height:38px;border-radius:50%;background:#fff;border:3px solid #0D9488;display:flex;align-items:center;justify-content:center;font-size:1.2rem;box-shadow:0 4px 14px rgba(13,148,136,.45)">${vt.emoji}</div>`,
+      html: '<div style="width:38px;height:38px;border-radius:50%;background:#fff;border:3px solid #0D9488;display:flex;align-items:center;justify-content:center;font-size:1.2rem;box-shadow:0 4px 14px rgba(13,148,136,.45)">' + vt.emoji + '</div>',
       iconSize: [38, 38],
       iconAnchor: [19, 19],
     }),
@@ -325,13 +315,13 @@ function drawVehiclePin(target) {
 }
 
 function clearRouteLayers() {
-  if (routeLayer)     { try { state.map.removeLayer(routeLayer); } catch {} routeLayer = null; }
-  if (routeGlowLayer) { try { state.map.removeLayer(routeGlowLayer); } catch {} routeGlowLayer = null; }
+  if (routeLayer) { try { state.map.removeLayer(routeLayer); } catch (e) {} routeLayer = null; }
+  if (routeGlowLayer) { try { state.map.removeLayer(routeGlowLayer); } catch (e) {} routeGlowLayer = null; }
 }
 
 function updateTrackStats(target, pickup) {
   const distEl = document.getElementById('trackDist');
-  const etaEl  = document.getElementById('trackEta');
+  const etaEl = document.getElementById('trackEta');
   const seatEl = document.getElementById('trackSeats');
 
   if (routeData && distEl && etaEl) {
@@ -348,7 +338,7 @@ function updateTrackStats(target, pickup) {
       const left = target.seats.total - target.seats.taken;
       seatEl.textContent = left + '/' + target.seats.total;
     } else {
-      seatEl.textContent = '—';
+      seatEl.textContent = '-';
     }
   }
 }
@@ -360,8 +350,8 @@ export function stopRouteTracking() {
   trackingTargetId = null;
 
   clearRouteLayers();
-  if (pickupMarker)  { try { state.map.removeLayer(pickupMarker); } catch {}  pickupMarker = null; }
-  if (vehiclePin)    { try { state.map.removeLayer(vehiclePin); } catch {}    vehiclePin = null; }
+  if (pickupMarker) { try { state.map.removeLayer(pickupMarker); } catch (e) {} pickupMarker = null; }
+  if (vehiclePin) { try { state.map.removeLayer(vehiclePin); } catch (e) {} vehiclePin = null; }
 
   document.getElementById('trackHud')?.classList.remove('show');
 }
@@ -370,7 +360,6 @@ export function stopRouteTracking() {
 //  GEOHASH LOCAL MESH
 // ============================================================
 const ROOM_SLOTS = CFG.LOCAL_ROOM_SLOTS || 20;
-let localRescanTimer = null;
 
 export async function joinLocalMesh(lat, lng) {
   if (typeof Peer === 'undefined') {
@@ -384,10 +373,9 @@ export async function joinLocalMesh(lat, lng) {
   state.localRoomPrefix = prefix;
 
   setText('localRoomId', gh.toUpperCase());
-  setText('localRoomSub', 'Your neighbourhood mesh · ~1 km radius');
-  setText('localPeerCount', 'Searching…');
+  setText('localRoomSub', 'Your neighbourhood mesh - ~1 km radius');
+  setText('localPeerCount', 'Searching...');
 
-  // Claim a slot
   let claimed = null;
   for (let i = 1; i <= ROOM_SLOTS; i++) {
     const id = prefix + '-' + i;
@@ -396,11 +384,10 @@ export async function joinLocalMesh(lat, lng) {
   }
 
   if (!claimed) {
-    setText('localRoomSub', 'Room is full · try again');
+    setText('localRoomSub', 'Room is full - try again');
     return;
   }
 
-  // Handle incoming connections
   claimed.on('connection', (conn) => {
     conn.on('open', () => {
       conn.send({
@@ -416,10 +403,9 @@ export async function joinLocalMesh(lat, lng) {
   });
 
   claimed.on('error', (err) => {
-    if (err.type !== 'peer-unavailable') console.warn('[presence] local peer:', err.type);
+    if (err.type !== 'peer-unavailable') console.warn('[presence] local:', err.type);
   });
 
-  // Scan other slots
   scanLocalRoom();
   clearInterval(localRescanTimer);
   localRescanTimer = setInterval(scanLocalRoom, 30000);
@@ -430,11 +416,11 @@ function tryClaimSlot(id) {
     let resolved = false;
     const p = new Peer(id, { debug: 0 });
     const t = setTimeout(() => {
-      if (!resolved) { resolved = true; try { p.destroy(); } catch {} resolve(null); }
+      if (!resolved) { resolved = true; try { p.destroy(); } catch (e) {} resolve(null); }
     }, 6000);
     p.on('open', () => { if (!resolved) { resolved = true; clearTimeout(t); resolve(p); } });
     p.on('error', () => {
-      if (!resolved) { resolved = true; clearTimeout(t); try { p.destroy(); } catch {} resolve(null); }
+      if (!resolved) { resolved = true; clearTimeout(t); try { p.destroy(); } catch (e) {} resolve(null); }
     });
   });
 }
@@ -452,7 +438,7 @@ function scanLocalRoom() {
     state.localPeers.set(targetId + ':pending', true);
 
     const cleanup = () => state.localPeers.delete(targetId + ':pending');
-    const t = setTimeout(() => { try { conn.close(); } catch {} cleanup(); }, 5000);
+    const t = setTimeout(() => { try { conn.close(); } catch (e) {} cleanup(); }, 5000);
 
     conn.on('open', () => {
       clearTimeout(t);
@@ -491,7 +477,6 @@ function attachLocalConn(conn) {
     } else if (data.type === 'chat') {
       if (onPeerMessage) onPeerMessage(data.text, data.sender, 'local-' + state.userGeohash);
     } else if (data.type === 'hive-post') {
-      // Handled by hive.js via the event bus
       window.dispatchEvent(new CustomEvent('steeradar:hive-broadcast', { detail: data.post }));
     }
   });
@@ -509,24 +494,161 @@ function updateLocalPeerUI() {
   setText('localPeerCount', peers.length + ' ' + word);
 }
 
-// ─── Broadcast ───
+// ============================================================
+//  BROADCAST
+// ============================================================
 export function broadcastToAllPeers(payload) {
   let sent = 0;
   for (const conn of state.connections.values()) {
-    if (conn.open) { try { conn.send(payload); sent++; } catch {} }
+    if (conn.open) { try { conn.send(payload); sent++; } catch (e) {} }
   }
   for (const conn of state.localConns.values()) {
-    if (conn.open) { try { conn.send(payload); sent++; } catch {} }
+    if (conn.open) { try { conn.send(payload); sent++; } catch (e) {} }
   }
   return sent;
 }
 
-// ─── Register chat callback so we can route incoming messages ───
+// ============================================================
+//  NEAR TAB RENDER
+// ============================================================
+export function renderNear() {
+  const wrap = document.getElementById('proximityWrap');
+  if (!wrap) return;
+
+  const localPeers = [...state.localPeers.entries()].filter(([k]) => !k.endsWith(':pending'));
+  const nearbyLanes = (state.lanes || []).filter(l => !l.mine && l.lat).slice(0, 3);
+  const cx = 50, cy = 50, maxR = 40;
+  const me = { lat: state.userLat, lng: state.userLng };
+  const hasMe = me.lat != null && me.lng != null;
+  const items = [];
+  const total = Math.max(localPeers.length + nearbyLanes.length, 1);
+
+  localPeers.forEach(([id, peer], i) => {
+    const real = hasMe && peer.lat != null;
+    const d = real ? distanceM(me, { lat: peer.lat, lng: peer.lng }) : (15 + Math.floor(Math.random() * 35));
+    const angle = (i / total) * 360 - 90;
+    const radius = Math.min((d / 70) * maxR, maxR);
+    const rad = (angle * Math.PI) / 180;
+    items.push({
+      x: cx + Math.cos(rad) * radius,
+      y: cy + Math.sin(rad) * radius,
+      avatar: peer.avatar,
+      name: peer.name,
+      dist: d,
+      type: 'peer',
+      id,
+    });
+  });
+
+  nearbyLanes.forEach((lane, i) => {
+    const real = hasMe && lane.lat && lane.lng;
+    const d = real ? distanceM(me, { lat: lane.lat, lng: lane.lng }) : (25 + Math.floor(Math.random() * 40));
+    const angle = ((localPeers.length + i) / total) * 360 - 90;
+    const radius = Math.min((d / 70) * maxR, maxR);
+    const rad = (angle * Math.PI) / 180;
+    items.push({
+      x: cx + Math.cos(rad) * radius,
+      y: cy + Math.sin(rad) * radius,
+      avatar: lane.avatar,
+      name: lane.driver,
+      dist: d,
+      type: 'lane',
+      id: lane.id,
+      coral: true,
+    });
+  });
+
+  let html = '';
+  html += '<div class="center-user">' + escapeHtml((state.userName || 'You').charAt(0).toUpperCase()) + '</div>';
+  html += '<div class="center-label">' + escapeHtml(state.vehicle) + ' - You</div>';
+
+  items.forEach((it, i) => {
+    html +=
+      '<div class="peer-bubble" style="left:' + it.x + '%;top:' + it.y + '%;transform:translate(-50%,-50%);animation-delay:' + (i * 0.06) + 's" data-type="' + it.type + '" data-id="' + escapeHtml(it.id) + '">' +
+        '<div class="p-avatar' + (it.coral ? ' coral' : '') + '">' + escapeHtml(it.avatar) + '</div>' +
+        '<div class="p-label"><span class="dist">' + fmtDist(it.dist) + '</span><br>' + escapeHtml(it.name.slice(0, 14)) + '</div>' +
+      '</div>';
+  });
+
+  html += '<div class="connected-pill"><span class="live-dot"></span> ' + localPeers.length + ' local - ' + nearbyLanes.length + ' lanes</div>';
+  wrap.innerHTML = html;
+
+  wrap.querySelectorAll('.peer-bubble').forEach(b => {
+    b.addEventListener('click', () => {
+      if (b.dataset.type === 'lane') {
+        const lane = state.lanes.find(l => l.id === b.dataset.id);
+        if (lane && window.Steeradar && window.Steeradar.chat) window.Steeradar.chat.openLane(lane);
+      } else if (b.dataset.type === 'peer') {
+        if (window.Steeradar && window.Steeradar.chat) window.Steeradar.chat.openLocal(b.dataset.id);
+      }
+    });
+  });
+
+  // Room list
+  const rooms = [];
+  if (localPeers.length || state.localRoomPrefix) {
+    const w = localPeers.length === 1 ? 'peer' : 'peers';
+    rooms.push({
+      id: 'local',
+      name: 'Neighbourhood room',
+      meta: localPeers.length + ' ' + w + ' - ' + (state.userGeohash ? state.userGeohash.toUpperCase() : '-'),
+      emoji: '📡',
+      local: true,
+    });
+  }
+  (state.lanes || []).filter(l => l.status === 'live').slice(0, 3).forEach(l => {
+    rooms.push({
+      id: l.id,
+      name: l.route.to + ' Lane',
+      meta: (l.seats.total - l.seats.taken) + ' seats left - ' + l.driver,
+      emoji: '🚌',
+    });
+  });
+  if (!rooms.length) {
+    rooms.push({ id: null, name: 'Community Chat', meta: 'No active rooms - Be the first', emoji: '💬' });
+  }
+
+  const countEl = document.getElementById('chatRoomsCount');
+  if (countEl) countEl.textContent = rooms.length + ' active';
+
+  const listEl = document.getElementById('roomList');
+  if (listEl) {
+    listEl.innerHTML = rooms.map(r =>
+      '<div class="room-card" data-id="' + (r.id || '') + '" data-local="' + (r.local ? '1' : '') + '">' +
+        '<div class="room-icon' + (r.local ? ' bt' : '') + '">' + r.emoji + '</div>' +
+        '<div class="room-info">' +
+          '<div class="room-name">' + escapeHtml(r.name) + ' <span class="live-dot"></span></div>' +
+          '<div class="room-meta">' + escapeHtml(r.meta) + '</div>' +
+        '</div>' +
+        '<button class="open-btn">' + (r.local ? 'Join' : 'Open') + '</button>' +
+      '</div>'
+    ).join('');
+
+    listEl.querySelectorAll('.room-card').forEach(card => {
+      card.addEventListener('click', () => {
+        if (card.dataset.local === '1') {
+          if (window.Steeradar && window.Steeradar.chat) window.Steeradar.chat.openLocal('room');
+          return;
+        }
+        const id = card.dataset.id;
+        if (!id) { showToast('No lanes yet'); return; }
+        const lane = state.lanes.find(l => l.id === id);
+        if (lane && window.Steeradar && window.Steeradar.chat) window.Steeradar.chat.openLane(lane);
+      });
+    });
+  }
+}
+
+// ============================================================
+//  CALLBACKS
+// ============================================================
 export function onIncomingPeerMessage(fn) {
   onPeerMessage = fn;
 }
 
-// ─── Utils ───
+// ============================================================
+//  UTILS
+// ============================================================
 function setText(id, value) {
   const el = document.getElementById(id);
   if (el) el.textContent = value;
@@ -538,7 +660,9 @@ function escapeHtml(s) {
   }[c]));
 }
 
-// ─── Public API ───
+// ============================================================
+//  PUBLIC API
+// ============================================================
 export const presence = {
   start: startPresence,
   stop: stopPresence,
@@ -547,5 +671,6 @@ export const presence = {
   startTracking: startRouteTracking,
   stopTracking: stopRouteTracking,
   onPeerMessage: onIncomingPeerMessage,
+  renderNear: renderNear,
   getLiveMarkers: () => liveMarkers,
 };
