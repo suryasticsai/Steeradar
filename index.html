@@ -4,604 +4,574 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#FFFFFF">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<title>Steeradar — Community Rides</title>
-<link rel="icon" type="image/png" href="https://raw.githubusercontent.com/suryasticsai/Steeradar/main/steerardar-logo.png">
+<title>Steeradar</title>
+<link rel="icon" type="image/png" href="./steerardar-logo.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <link rel="stylesheet" href="./styles.css">
 
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- ON-SCREEN ERROR OVERLAY — nothing is ever blank again      -->
-<!-- ════════════════════════════════════════════════════════════ -->
 <style>
-  #bootError {
-    display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 99999;
-    background: #FFFFFF;
-    padding: 40px 24px;
-    text-align: center;
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    overflow-y: auto;
-  }
-  #bootError.show { display: block; }
-  #bootError .icon { font-size: 3rem; margin-bottom: 12px; }
-  #bootError h2 { color: #DC2626; margin: 0 0 12px; font-size: 1.3rem; }
-  #bootError p { color: #4B5563; margin: 0 0 20px; font-size: 0.9rem; line-height: 1.5; }
-  #bootError pre {
-    text-align: left;
-    background: #F1F3F6;
-    padding: 14px;
-    border-radius: 10px;
-    font-family: 'SF Mono', Monaco, monospace;
-    font-size: 0.72rem;
-    overflow-x: auto;
-    color: #DC2626;
-    margin-bottom: 20px;
-    white-space: pre-wrap;
-    word-break: break-all;
-    max-height: 300px;
-    overflow-y: auto;
-  }
-  #bootError button {
-    padding: 14px 28px;
-    border-radius: 12px;
-    background: #0D9488;
-    color: #fff;
-    font-weight: 700;
-    font-size: 0.95rem;
-    border: none;
-    cursor: pointer;
-    margin-right: 8px;
-  }
-  #bootError .btn-secondary { background: #F1F3F6; color: #111827; }
+/* CRITICAL INLINE STYLES - these cannot fail to load */
+#onboardGate {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: #FFFFFF !important;
+  color: #111827 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 24px !important;
+  z-index: 99999 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  overflow-y: auto !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+}
+#onboardGate.gate-hidden {
+  display: none !important;
+}
+#onboardGate .onboard-logo {
+  width: 110px !important;
+  height: 110px !important;
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  margin-bottom: 24px !important;
+  border: 2px solid #0D9488 !important;
+  background: #F8F9FB !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+#onboardGate .onboard-logo img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+#onboardGate .onboard-title {
+  font-size: 2.5rem !important;
+  font-weight: 700 !important;
+  margin: 0 0 8px 0 !important;
+  text-align: center !important;
+  color: #111827 !important;
+  letter-spacing: -1px !important;
+}
+#onboardGate .onboard-title .teal { color: #0D9488 !important; }
+#onboardGate .onboard-title .red { color: #DC2626 !important; }
+#onboardGate .onboard-tagline {
+  font-size: 0.95rem !important;
+  color: #4B5563 !important;
+  margin: 0 0 32px 0 !important;
+  text-align: center !important;
+  max-width: 320px !important;
+}
+#onboardGate .onboard-card {
+  width: 100% !important;
+  max-width: 400px !important;
+  background: #FFFFFF !important;
+  border: 1px solid #E5E7EB !important;
+  border-radius: 20px !important;
+  padding: 24px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06) !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+#onboardGate .oc-label {
+  font-size: 0.7rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 1.2px !important;
+  text-transform: uppercase !important;
+  color: #9CA3AF !important;
+  margin-bottom: 10px !important;
+  display: block !important;
+}
+#onboardGate .oc-label .req { color: #DC2626 !important; }
+#onboardGate .vehicle-input-wrap {
+  position: relative !important;
+  margin-bottom: 12px !important;
+  display: block !important;
+}
+#onboardGate .vehicle-input-wrap input {
+  width: 100% !important;
+  padding: 16px 48px 16px 18px !important;
+  border-radius: 12px !important;
+  background: #F8F9FB !important;
+  border: 1.5px solid #E5E7EB !important;
+  color: #111827 !important;
+  font-size: 1.1rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 2px !important;
+  text-transform: uppercase !important;
+  text-align: center !important;
+  box-sizing: border-box !important;
+}
+#onboardGate .oc-hint {
+  font-size: 0.72rem !important;
+  color: #9CA3AF !important;
+  margin-bottom: 20px !important;
+  display: block !important;
+}
+#onboardGate .oc-hint .example { color: #0D9488 !important; font-weight: 600 !important; }
+#onboardGate .oc-btn {
+  width: 100% !important;
+  padding: 16px !important;
+  border-radius: 12px !important;
+  background: #0D9488 !important;
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+  border: none !important;
+  display: block !important;
+  cursor: pointer !important;
+}
+#onboardGate .oc-btn:disabled { opacity: 0.5 !important; cursor: not-allowed !important; }
+#onboardGate .oc-features {
+  display: flex !important;
+  gap: 22px !important;
+  margin-top: 30px !important;
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+}
+#onboardGate .oc-feature {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-size: 0.68rem !important;
+  color: #9CA3AF !important;
+  font-weight: 600 !important;
+}
+#onboardGate .oc-feature .ic {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 50% !important;
+  background: #F1F3F6 !important;
+  border: 1px solid #E5E7EB !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 0.95rem !important;
+}
+#onboardGate .onboard-foot {
+  margin-top: 24px !important;
+  font-size: 0.7rem !important;
+  color: #9CA3AF !important;
+  text-align: center !important;
+  max-width: 320px !important;
+  display: block !important;
+}
+#bootError {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #FFFFFF;
+  z-index: 999999;
+  padding: 40px 24px;
+  overflow-y: auto;
+  font-family: -apple-system, sans-serif;
+}
+#bootError.show { display: block; }
+#bootError h2 { color: #DC2626; margin: 0 0 12px; font-size: 1.3rem; }
+#bootError p { color: #4B5563; margin: 0 0 20px; font-size: 0.9rem; }
+#bootError pre {
+  background: #F1F3F6;
+  padding: 14px;
+  border-radius: 10px;
+  font-family: monospace;
+  font-size: 0.72rem;
+  color: #DC2626;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-bottom: 20px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+#bootError button {
+  padding: 14px 28px;
+  border-radius: 12px;
+  background: #0D9488;
+  color: #fff;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  margin-right: 8px;
+}
 </style>
 </head>
 <body>
 
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- ERROR OVERLAY                                              -->
-<!-- ════════════════════════════════════════════════════════════ -->
+<!-- ERROR OVERLAY -->
 <div id="bootError">
-  <div class="icon">⚠️</div>
   <h2>Something went wrong</h2>
-  <p>The app couldn't start. Here's the exact error:</p>
-  <pre id="bootErrorText">Loading…</pre>
+  <p>The app could not start. Error details below:</p>
+  <pre id="bootErrorText">Loading...</pre>
   <button onclick="location.reload()">Reload</button>
-  <button class="btn-secondary" onclick="document.getElementById('bootError').classList.remove('show');document.getElementById('app').style.display=''">Continue anyway</button>
 </div>
 
 <script>
-  // ─── Global error trap: show ANY error on screen ───
-  window.__steeradarErrors = [];
-  function showBootError(msg) {
-    window.__steeradarErrors.push(msg);
-    const el = document.getElementById('bootError');
-    const txt = document.getElementById('bootErrorText');
-    if (!el || !txt) return;
-    txt.textContent = window.__steeradarErrors.join('\n\n────────\n\n');
+// Global error trap
+window.__errs = [];
+window.__showErr = function (msg) {
+  window.__errs.push(msg);
+  var el = document.getElementById('bootError');
+  var txt = document.getElementById('bootErrorText');
+  if (el && txt) {
+    txt.textContent = window.__errs.join('\n\n---\n\n');
     el.classList.add('show');
   }
-
-  window.addEventListener('error', (e) => {
-    const loc = e.filename ? e.filename.split('/').pop() + ':' + e.lineno : '';
-    showBootError('[' + loc + '] ' + (e.message || 'Unknown error'));
-  });
-
-  window.addEventListener('unhandledrejection', (e) => {
-    const reason = e.reason;
-    showBootError('Unhandled promise: ' + (reason?.message || String(reason)));
-  });
+};
+window.addEventListener('error', function (e) {
+  var loc = e.filename ? e.filename.split('/').pop() + ':' + e.lineno : '';
+  window.__showErr('[' + loc + '] ' + (e.message || 'Unknown'));
+});
+window.addEventListener('unhandledrejection', function (e) {
+  window.__showErr('Promise: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason)));
+});
 </script>
 
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- ONBOARDING GATE                                            -->
-<!-- ════════════════════════════════════════════════════════════ -->
+<!-- ONBOARDING GATE - RENDERS BEFORE ANY MODULE LOADS -->
 <div id="onboardGate">
   <div class="onboard-logo">
-    <img src="https://raw.githubusercontent.com/suryasticsai/Steeradar/main/steerardar-logo.png" alt="Steeradar"
-      onerror="this.style.display='none';this.parentNode.innerHTML='<svg width=\'70\' height=\'70\' viewBox=\'0 0 32 32\' fill=\'none\'><circle cx=\'16\' cy=\'16\' r=\'13\' stroke=\'%230D9488\' stroke-width=\'2\'/><circle cx=\'16\' cy=\'16\' r=\'4\' fill=\'%230D9488\'/></svg>'">
+    <img src="./steerardar-logo.png" alt="Steeradar">
   </div>
-  <h1 class="onboard-title"><span>Steer</span><span class="adar">adar</span><span class="dot">.</span></h1>
+  <h1 class="onboard-title">
+    <span>Steer</span><span class="teal">adar</span><span class="red">.</span>
+  </h1>
   <p class="onboard-tagline">Live community rides. Enter your vehicle to unlock.</p>
 
   <div class="onboard-card">
     <div class="oc-label">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 12h18M8 6V4M16 6V4"/></svg>
       Vehicle number <span class="req">REQUIRED</span>
     </div>
     <div class="vehicle-input-wrap">
       <input type="text" id="onboardVehicle" placeholder="Enter vehicle number" maxlength="15" autocomplete="off" autocapitalize="characters">
-      <svg class="v-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
     </div>
     <div class="oc-hint">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
       Format like <span class="example">KA01AB1234</span>
     </div>
-    <button class="oc-btn" id="onboardBtn" disabled>
-      <span>Continue</span>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
-    </button>
+    <button class="oc-btn" id="onboardBtn" disabled>Continue</button>
   </div>
 
   <div class="oc-features">
-    <div class="oc-feature"><div class="ic">📍</div>Live map</div>
-    <div class="oc-feature"><div class="ic">💬</div>Peer chat</div>
-    <div class="oc-feature"><div class="ic">📡</div>Local mesh</div>
-    <div class="oc-feature"><div class="ic">🐝</div>Community</div>
+    <div class="oc-feature"><div class="ic">&#128205;</div>Live map</div>
+    <div class="oc-feature"><div class="ic">&#128172;</div>Peer chat</div>
+    <div class="oc-feature"><div class="ic">&#128225;</div>Local mesh</div>
+    <div class="oc-feature"><div class="ic">&#128029;</div>Community</div>
   </div>
+
   <p class="onboard-foot">Your vehicle number is stored locally and used as your Steeradar identity.</p>
 </div>
 
-<!-- Onboarding Step 2: Photos -->
-<div id="onboardPhotos" style="display:none;flex-direction:column;align-items:center;padding:30px 24px;max-width:480px;margin:auto">
-  <h2 class="onboard-title"><span>Almost</span><span class="adar">there</span><span class="dot">.</span></h2>
+<!-- ONBOARDING PHOTOS STEP -->
+<div id="onboardPhotos" style="display:none;flex-direction:column;align-items:center;padding:30px 24px;max-width:480px;margin:auto;position:fixed;top:0;left:0;right:0;bottom:0;background:#fff;z-index:99998;overflow-y:auto">
+  <h2 class="onboard-title" style="font-size:2rem;margin-bottom:8px">Almost there</h2>
   <p class="onboard-tagline">Add your documents. Only you can see your plate and QR.</p>
 
-  <div class="photo-grid">
-    <label class="photo-card" data-slot="avatar">
+  <div class="photo-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:400px;width:100%;margin:24px 0 20px">
+    <label class="photo-card" data-slot="avatar" style="display:flex;flex-direction:column;gap:8px;cursor:pointer">
       <input type="file" accept="image/*" capture="user" hidden>
-      <div class="photo-preview"><span class="photo-placeholder">📷</span></div>
-      <div class="photo-label">Your photo</div>
+      <div class="photo-preview" style="aspect-ratio:1;border-radius:16px;background:#F8F9FB;border:2px dashed #D1D5DB;display:flex;align-items:center;justify-content:center;overflow:hidden">
+        <span class="photo-placeholder" style="font-size:2rem;opacity:0.35">&#128247;</span>
+      </div>
+      <div class="photo-label" style="font-size:0.72rem;font-weight:700;color:#4B5563;text-align:center">Your photo</div>
     </label>
-    <label class="photo-card" data-slot="vehiclePhoto">
+    <label class="photo-card" data-slot="vehiclePhoto" style="display:flex;flex-direction:column;gap:8px;cursor:pointer">
       <input type="file" accept="image/*" capture="environment" hidden>
-      <div class="photo-preview"><span class="photo-placeholder">🚗</span></div>
-      <div class="photo-label">Vehicle photo</div>
+      <div class="photo-preview" style="aspect-ratio:1;border-radius:16px;background:#F8F9FB;border:2px dashed #D1D5DB;display:flex;align-items:center;justify-content:center;overflow:hidden">
+        <span class="photo-placeholder" style="font-size:2rem;opacity:0.35">&#128663;</span>
+      </div>
+      <div class="photo-label" style="font-size:0.72rem;font-weight:700;color:#4B5563;text-align:center">Vehicle photo</div>
     </label>
-    <label class="photo-card" data-slot="platePhoto">
+    <label class="photo-card" data-slot="platePhoto" style="display:flex;flex-direction:column;gap:8px;cursor:pointer">
       <input type="file" accept="image/*" capture="environment" hidden>
-      <div class="photo-preview"><span class="photo-placeholder">🔢</span></div>
-      <div class="photo-label">Number plate</div>
+      <div class="photo-preview" style="aspect-ratio:1;border-radius:16px;background:#F8F9FB;border:2px dashed #D1D5DB;display:flex;align-items:center;justify-content:center;overflow:hidden">
+        <span class="photo-placeholder" style="font-size:2rem;opacity:0.35">&#128290;</span>
+      </div>
+      <div class="photo-label" style="font-size:0.72rem;font-weight:700;color:#4B5563;text-align:center">Number plate</div>
     </label>
-    <label class="photo-card" data-slot="upiQr">
+    <label class="photo-card" data-slot="upiQr" style="display:flex;flex-direction:column;gap:8px;cursor:pointer">
       <input type="file" accept="image/*" hidden>
-      <div class="photo-preview"><span class="photo-placeholder">💳</span></div>
-      <div class="photo-label">UPI QR</div>
+      <div class="photo-preview" style="aspect-ratio:1;border-radius:16px;background:#F8F9FB;border:2px dashed #D1D5DB;display:flex;align-items:center;justify-content:center;overflow:hidden">
+        <span class="photo-placeholder" style="font-size:2rem;opacity:0.35">&#128179;</span>
+      </div>
+      <div class="photo-label" style="font-size:0.72rem;font-weight:700;color:#4B5563;text-align:center">UPI QR</div>
     </label>
   </div>
 
-  <button class="oc-btn" id="onboardPhotosDone" disabled style="max-width:400px;width:100%">Save &amp; unlock</button>
-  <button class="btn-secondary" id="onboardPhotosSkip" style="margin-top:8px;max-width:400px;width:100%">Skip for now</button>
+  <button class="oc-btn" id="onboardPhotosDone" disabled style="max-width:400px;width:100%">Save and unlock</button>
+  <button id="onboardPhotosSkip" style="margin-top:8px;max-width:400px;width:100%;padding:14px;border-radius:12px;background:#F1F3F6;color:#111827;border:1px solid #E5E7EB;font-weight:600">Skip for now</button>
 </div>
 
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- MAIN APP                                                   -->
-<!-- ════════════════════════════════════════════════════════════ -->
-<div id="app">
-  <header>
-    <div class="logo" id="logoTrigger" title="Long-press for diagnostics">
-      <img class="logo-img" src="https://raw.githubusercontent.com/suryasticsai/Steeradar/main/steerardar-logo.png" alt="Steeradar"
-        onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<svg width=\'32\' height=\'32\' viewBox=\'0 0 32 32\' fill=\'none\'><circle cx=\'16\' cy=\'16\' r=\'13\' stroke=\'%230D9488\' stroke-width=\'2\'/><circle cx=\'16\' cy=\'16\' r=\'4\' fill=\'%230D9488\'/></svg>')">
-      <div class="logo-text"><span>Steer</span><span class="adar">adar</span><span class="dot">.</span></div>
+<!-- MAIN APP -->
+<div id="app" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;max-width:480px;margin:0 auto;background:#fff;flex-direction:column;overflow:hidden">
+  <header style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px 10px;flex-shrink:0;background:#fff">
+    <div class="logo" id="logoTrigger" style="display:flex;align-items:center;gap:9px;font-weight:700;font-size:1.2rem">
+      <img class="logo-img" src="./steerardar-logo.png" alt="Steeradar" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:1.5px solid #D1D5DB">
+      <div class="logo-text" style="display:flex;align-items:baseline">
+        <span>Steer</span><span style="color:#0D9488">adar</span><span style="color:#DC2626;font-size:1.5rem;line-height:0;margin-left:1px">.</span>
+      </div>
     </div>
-    <div class="header-actions">
-      <button class="vehicle-badge" id="vehicleBadge" title="Settings">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 12h18"/></svg>
-        <span id="vehicleBadgeText">—</span>
+    <div class="header-actions" style="display:flex;gap:8px;align-items:center">
+      <button class="vehicle-badge" id="vehicleBadge" style="display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:20px;background:#F1F3F6;border:1px solid #E5E7EB;font-size:0.68rem;font-weight:700;color:#4B5563;max-width:130px;overflow:hidden">
+        <span id="vehicleBadgeText">-</span>
       </button>
-      <button class="header-btn" id="notifBtn" title="Notifications">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-      </button>
-      <button class="avatar-btn" id="avatarBtn">?</button>
+      <button class="header-btn" id="notifBtn" style="width:36px;height:36px;border-radius:50%;background:#F1F3F6;border:1px solid #E5E7EB;display:flex;align-items:center;justify-content:center;color:#4B5563">&#128276;</button>
+      <button class="avatar-btn" id="avatarBtn" style="width:36px;height:36px;border-radius:50%;background:#0D9488;color:#fff;border:2px solid #F8F9FB;font-weight:700;font-size:0.85rem">?</button>
     </div>
   </header>
 
-  <div class="content">
-    <!-- ─── PULSE (Map) ─── -->
-    <div id="pulseView" class="view active">
-      <div id="map"></div>
-      <button class="map-refresh" id="mapRefresh" title="Refresh map">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
-      </button>
-      <div class="pulse-overlay">
-        <div class="location-pill" id="locationPill">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-          <span class="loc-text" id="locText">Locating…</span>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.4"><polyline points="6 9 12 15 18 9"/></svg>
+  <div class="content" style="flex:1;position:relative;overflow:hidden">
+    <div id="pulseView" class="view active" style="position:absolute;top:0;left:0;right:0;bottom:0;overflow:hidden;opacity:1;background:#fff">
+      <div id="map" style="position:absolute;top:0;left:0;right:0;bottom:0;background:#F8F9FB"></div>
+      <div class="pulse-overlay" style="position:absolute;top:0;left:0;right:0;padding:0 14px;z-index:10">
+        <div class="location-pill" id="locationPill" style="display:flex;align-items:center;gap:9px;background:#fff;border:1px solid #E5E7EB;border-radius:28px;padding:10px 16px;margin-bottom:10px;font-size:0.85rem;font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+          <span class="loc-text" id="locText">Locating...</span>
         </div>
-        <div class="filter-row">
-          <button class="chip active" data-filter="live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Live now</button>
-          <button class="chip" data-filter="all">All</button>
-          <button class="chip" data-filter="seats">Has seats</button>
-          <button class="chip" data-filter="mine">My lanes</button>
+        <div class="filter-row" style="display:flex;gap:8px;overflow-x:auto">
+          <button class="chip active" data-filter="live" style="padding:8px 14px;border-radius:24px;background:#111827;color:#fff;border:1px solid #111827;font-size:0.76rem;font-weight:600">Live now</button>
+          <button class="chip" data-filter="all" style="padding:8px 14px;border-radius:24px;background:#fff;color:#4B5563;border:1px solid #E5E7EB;font-size:0.76rem;font-weight:600">All</button>
+          <button class="chip" data-filter="seats" style="padding:8px 14px;border-radius:24px;background:#fff;color:#4B5563;border:1px solid #E5E7EB;font-size:0.76rem;font-weight:600">Has seats</button>
+          <button class="chip" data-filter="mine" style="padding:8px 14px;border-radius:24px;background:#fff;color:#4B5563;border:1px solid #E5E7EB;font-size:0.76rem;font-weight:600">My lanes</button>
         </div>
       </div>
-      <div class="map-lane-card" id="mapLaneCard"></div>
+      <div class="map-lane-card" id="mapLaneCard" style="position:absolute;bottom:130px;left:14px;right:14px;background:#fff;border-radius:20px;padding:16px;box-shadow:0 20px 50px rgba(0,0,0,0.12);transform:translateY(200%);transition:transform 0.3s ease"></div>
     </div>
 
-    <!-- ─── LANES ─── -->
-    <div id="lanesView" class="view">
-      <div class="view-header">
-        <span class="right-pill" id="connBadge"><span class="live-dot"></span> Connecting</span>
-        <h2>Live Lanes</h2>
-        <p>Real-time community rides near you</p>
+    <div id="lanesView" class="view" style="position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;opacity:0;pointer-events:none;padding-bottom:130px;background:#fff;padding:0 0 130px 0">
+      <div style="padding:8px 20px 16px">
+        <h2 style="font-size:1.6rem;font-weight:700;margin:0 0 4px 0">Live Lanes</h2>
+        <p style="font-size:0.85rem;color:#4B5563;margin:0">Real-time community rides near you</p>
       </div>
-      <div class="lane-list" id="laneList"></div>
+      <div class="lane-list" id="laneList" style="padding:0 16px"></div>
     </div>
 
-    <!-- ─── NEAR ─── -->
-    <div id="nearView" class="view">
-      <div class="view-header"><h2>Near</h2><p>Vehicles and people around you</p></div>
-      <div class="local-room-banner">
-        <div class="lrb-head">
-          <div class="lrb-icon">📡</div>
-          <div style="flex:1;min-width:0">
-            <div class="lrb-title">Local Steeradar</div>
-            <div class="lrb-sub" id="localRoomSub">Finding your neighbourhood…</div>
-          </div>
-        </div>
-        <div class="lrb-stats">
-          <div class="lrb-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg><span id="localPeerCount">0 peers</span></div>
-        </div>
-        <div class="lrb-room">Room: <span id="localRoomId">—</span></div>
+    <div id="nearView" class="view" style="position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;opacity:0;pointer-events:none;padding-bottom:130px;background:#fff">
+      <div style="padding:8px 20px 16px">
+        <h2 style="font-size:1.6rem;font-weight:700;margin:0 0 4px 0">Near</h2>
+        <p style="font-size:0.85rem;color:#4B5563;margin:0">Vehicles and people around you</p>
       </div>
-      <div class="proximity-wrap" id="proximityWrap"></div>
-      <div class="section-label">Bluetooth nearby</div>
-      <div class="bt-panel">
-        <div class="bt-head">
-          <div class="bt-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7l12 10-6 5V2l6 5L6 17"/></svg>Discover devices</div>
-          <button class="bt-scan-btn" id="btScanBtn">Scan</button>
-        </div>
-        <div id="btDevices"><div class="bt-empty">Tap Scan to discover nearby Bluetooth devices</div></div>
-      </div>
-      <div class="section-label">Local chat rooms <span class="see-all" id="chatRoomsCount"></span></div>
+      <div class="proximity-wrap" id="proximityWrap" style="height:380px;margin:0 16px 20px;border-radius:20px;background:#F8F9FB;border:1px solid #E5E7EB;position:relative;overflow:hidden"></div>
+      <div class="section-label" style="padding:4px 20px 12px;font-size:0.68rem;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#9CA3AF">Local chat rooms</div>
       <div id="roomList"></div>
     </div>
 
-    <!-- ─── HIVE ─── -->
-    <div id="hiveView" class="view">
-      <div class="hive-header"><h1>Hive</h1><p>Your community. All aboard.</p></div>
-      <div class="story-row" id="storyRow"></div>
-      <div class="greeting-card">
-        <h3 id="greetingText">Good evening 👋</h3>
-        <p>Here's what's happening in your community.</p>
-        <span class="tag" id="greetingTag">Your neighbourhood</span>
+    <div id="hiveView" class="view" style="position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;opacity:0;pointer-events:none;padding-bottom:130px;background:#fff">
+      <div style="padding:8px 20px 20px">
+        <h1 style="font-size:2rem;font-weight:700;color:#111827;margin:0 0 4px 0">Hive</h1>
+        <p style="font-size:0.85rem;color:#4B5563;margin:0">Your community. All aboard.</p>
       </div>
-      <div class="section-label">Local posts <span class="see-all" id="hiveCount"></span></div>
-      <div id="hiveFeed"></div>
+      <div class="story-row" id="storyRow" style="display:flex;gap:12px;padding:0 20px 20px;overflow-x:auto"></div>
+      <div class="greeting-card" style="margin:0 20px 24px;padding:20px;background:linear-gradient(135deg,rgba(13,148,136,0.08),rgba(124,58,237,0.1));border:1px solid #E5E7EB;border-radius:20px">
+        <h3 id="greetingText" style="font-size:1.15rem;font-weight:700;margin:0 0 6px 0">Hello</h3>
+        <p style="font-size:0.82rem;color:#4B5563;margin:0 0 12px 0">Here is what is happening in your community.</p>
+        <span style="display:inline-block;padding:5px 12px;border-radius:20px;background:#fff;border:1px solid #E5E7EB;font-size:0.68rem;font-weight:600;color:#4B5563">Your neighbourhood</span>
+      </div>
+      <div class="section-label" style="padding:4px 20px 12px;font-size:0.68rem;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#9CA3AF">Local posts <span id="hiveCount" style="float:right;font-weight:600;color:#0D9488;text-transform:none;letter-spacing:0"></span></div>
+      <div id="hiveFeed" style="padding:0 16px"></div>
     </div>
   </div>
 
-  <button class="fab" id="fabBtn">
-    <span class="fab-icon">+</span>
-    <span class="fab-text">
-      <span id="fabLabel">Post my lane</span>
-      <span class="fab-sub">Share seats &amp; route</span>
+  <button class="fab" id="fabBtn" style="position:absolute;bottom:94px;left:50%;transform:translateX(-50%);padding:13px 22px 13px 16px;border-radius:30px;background:#111827;color:#fff;font-weight:700;font-size:0.86rem;display:flex;align-items:center;gap:9px;box-shadow:0 20px 50px rgba(0,0,0,0.12);z-index:40;border:none">
+    <span style="width:24px;height:24px;border-radius:50%;background:#fff;color:#111827;display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:300">+</span>
+    <span style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.15">
+      <span id="fabLabel" style="font-size:0.86rem;font-weight:700">Post my lane</span>
+      <span style="font-size:0.65rem;font-weight:500;opacity:0.7">Share seats and route</span>
     </span>
   </button>
 
-  <nav class="bottom-nav">
-    <button class="nav-item active" data-tab="pulse"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Pulse</button>
-    <button class="nav-item" data-tab="lanes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 12h18M8 6V4M16 6V4"/><circle cx="8" cy="16" r="1.2" fill="currentColor"/><circle cx="16" cy="16" r="1.2" fill="currentColor"/></svg>Lanes</button>
-    <button class="nav-item" data-tab="near"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><path d="M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" opacity="0.5"/></svg>Near</button>
-    <button class="nav-item" data-tab="hive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 3v9M12 12l8 4.5M12 12l-8 4.5"/></svg>Hive</button>
+  <nav class="bottom-nav" style="position:absolute;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #E5E7EB;display:flex;align-items:center;justify-content:space-around;padding:8px 0;z-index:45">
+    <button class="nav-item active" data-tab="pulse" style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 14px;color:#111827;font-size:0.62rem;font-weight:600;background:none;border:none">Pulse</button>
+    <button class="nav-item" data-tab="lanes" style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 14px;color:#9CA3AF;font-size:0.62rem;font-weight:600;background:none;border:none">Lanes</button>
+    <button class="nav-item" data-tab="near" style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 14px;color:#9CA3AF;font-size:0.62rem;font-weight:600;background:none;border:none">Near</button>
+    <button class="nav-item" data-tab="hive" style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 14px;color:#9CA3AF;font-size:0.62rem;font-weight:600;background:none;border:none">Hive</button>
   </nav>
 </div>
 
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- LIVE TRACKING HUD                                          -->
-<!-- ════════════════════════════════════════════════════════════ -->
-<div class="track-hud" id="trackHud">
-  <div class="track-row-1">
-    <div class="track-avatar" id="trackAvatar">?</div>
-    <div class="track-info">
-      <div class="track-name" id="trackName">—</div>
-      <div class="track-meta" id="trackMeta">—</div>
+<!-- MODALS (minimal placeholders; full versions styled by styles.css) -->
+<div class="modal-overlay" id="postModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(17,24,39,0.4);z-index:1000;align-items:flex-end;justify-content:center">
+  <div class="modal" style="background:#fff;border-radius:24px 24px 0 0;padding:20px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto">
+    <div class="modal-head" style="display:flex;justify-content:space-between;margin-bottom:18px">
+      <h3 style="margin:0;font-size:1.25rem;font-weight:700">Post your lane</h3>
+      <button class="modal-close" data-close="#postModal" style="width:34px;height:34px;border-radius:50%;background:#F1F3F6;border:1px solid #E5E7EB">X</button>
     </div>
-    <button class="track-close" id="trackClose">✕</button>
+    <div class="vehicle-type-grid" id="vehicleTypeGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px"></div>
+    <label style="display:block;font-size:0.7rem;font-weight:700;color:#9CA3AF;margin-bottom:6px;text-transform:uppercase">Destination</label>
+    <input type="text" id="pDest" placeholder="Downtown Central" style="width:100%;padding:12px 15px;border-radius:12px;background:#F8F9FB;border:1.5px solid #E5E7EB;color:#111827;font-size:0.9rem;margin-bottom:14px;box-sizing:border-box">
+    <label style="display:block;font-size:0.7rem;font-weight:700;color:#9CA3AF;margin-bottom:6px;text-transform:uppercase">Route stops (comma separated)</label>
+    <input type="text" id="pRoute" placeholder="Maple, Oak, Center" style="width:100%;padding:12px 15px;border-radius:12px;background:#F8F9FB;border:1.5px solid #E5E7EB;color:#111827;font-size:0.9rem;margin-bottom:14px;box-sizing:border-box">
+    <label style="display:block;font-size:0.7rem;font-weight:700;color:#9CA3AF;margin-bottom:6px;text-transform:uppercase">Seats available</label>
+    <div class="seat-selector" id="seatSelector" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <button class="seat-btn" data-seats="40" style="flex:1;min-width:58px;padding:12px 6px;border-radius:12px;background:#F8F9FB;border:1.5px solid #E5E7EB">40</button>
+      <button class="seat-btn" data-seats="4" style="flex:1;min-width:58px;padding:12px 6px;border-radius:12px;background:#F8F9FB;border:1.5px solid #E5E7EB">4</button>
+      <button class="seat-btn" data-seats="3" style="flex:1;min-width:58px;padding:12px 6px;border-radius:12px;background:#F8F9FB;border:1.5px solid #E5E7EB">3</button>
+      <button class="seat-btn" data-seats="2" style="flex:1;min-width:58px;padding:12px 6px;border-radius:12px;background:#F8F9FB;border:1.5px solid #E5E7EB">2</button>
+      <button class="seat-btn" data-seats="1" style="flex:1;min-width:58px;padding:12px 6px;border-radius:12px;background:#F8F9FB;border:1.5px solid #E5E7EB">1</button>
+      <button class="seat-btn" data-seats="0" style="flex:1;min-width:58px;padding:12px 6px;border-radius:12px;background:#F8F9FB;border:1.5px solid #E5E7EB">0</button>
+    </div>
+    <label style="display:block;font-size:0.7rem;font-weight:700;color:#9CA3AF;margin-bottom:6px;text-transform:uppercase">Fare</label>
+    <input type="number" id="pFare" value="20" style="width:100%;padding:12px 15px;border-radius:12px;background:#F8F9FB;border:1.5px solid #E5E7EB;color:#111827;font-size:0.9rem;margin-bottom:14px;box-sizing:border-box">
+    <button class="btn-primary" id="postConfirm" style="width:100%;padding:14px;border-radius:12px;background:#0D9488;color:#fff;font-weight:700;border:none">Go live</button>
   </div>
-  <div class="track-row-2">
-    <div class="track-stat"><div class="track-stat-val" id="trackDist">—</div><div class="track-stat-lbl">Away</div></div>
-    <div class="track-stat"><div class="track-stat-val" id="trackEta">—</div><div class="track-stat-lbl">ETA</div></div>
-    <div class="track-stat"><div class="track-stat-val" id="trackSeats">—</div><div class="track-stat-lbl">Seats</div></div>
-  </div>
-  <button class="track-chat" id="trackChat">💬 Message driver</button>
 </div>
 
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- POST LANE MODAL                                            -->
-<!-- ════════════════════════════════════════════════════════════ -->
-<div class="modal-overlay" id="postModal"><div class="modal">
-  <div class="modal-head"><h3>Post your lane</h3><button class="modal-close" data-close="#postModal">✕</button></div>
-  <label>What are you driving?</label>
-  <div class="vehicle-type-grid" id="vehicleTypeGrid"></div>
-  <label>Destination</label>
-  <input type="text" id="pDest" placeholder="e.g. Downtown Central">
-  <label>Route stops (comma separated)</label>
-  <input type="text" id="pRoute" placeholder="Maple, Oak, Center St">
-  <label>Seats available</label>
-  <div class="seat-selector" id="seatSelector">
-    <button class="seat-btn" data-seats="40"><span class="num">40</span><span class="lbl">Bus</span></button>
-    <button class="seat-btn" data-seats="4"><span class="num">4</span><span class="lbl">Car</span></button>
-    <button class="seat-btn" data-seats="3"><span class="num">3</span><span class="lbl">Auto</span></button>
-    <button class="seat-btn" data-seats="2"><span class="num">2</span><span class="lbl">Shared</span></button>
-    <button class="seat-btn" data-seats="1"><span class="num">1</span><span class="lbl">Single</span></button>
-    <button class="seat-btn" data-seats="0"><span class="num">0</span><span class="lbl">Full</span></button>
-  </div>
-  <label>Fare (₹)</label>
-  <input type="number" id="pFare" placeholder="20" value="20" min="0">
-  <button class="btn-primary" id="postConfirm">Go live</button>
-</div></div>
+<!-- Other modals - simplified -->
+<div class="modal-overlay" id="requestModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(17,24,39,0.4);z-index:1000;align-items:flex-end;justify-content:center"><div class="modal" style="background:#fff;border-radius:24px 24px 0 0;padding:20px;width:100%;max-width:480px"><div class="modal-head" style="display:flex;justify-content:space-between;margin-bottom:18px"><h3 style="margin:0">Request a seat</h3><button class="modal-close" data-close="#requestModal" style="width:34px;height:34px;border-radius:50%;background:#F1F3F6;border:1px solid #E5E7EB">X</button></div><p id="reqInfo" style="color:#4B5563;font-size:0.85rem"></p><textarea id="reqMsg" placeholder="Hi!" style="width:100%;padding:12px;border-radius:12px;background:#F8F9FB;border:1.5px solid #E5E7EB;box-sizing:border-box;min-height:70px"></textarea><button class="btn-primary" id="reqConfirm" style="width:100%;padding:14px;border-radius:12px;background:#0D9488;color:#fff;font-weight:700;border:none;margin-top:12px">Send</button></div></div>
 
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- EDIT LANE MODAL                                            -->
-<!-- ════════════════════════════════════════════════════════════ -->
-<div class="modal-overlay" id="editLaneModal"><div class="modal">
-  <div class="modal-head"><h3>Edit lane</h3><button class="modal-close" data-close="#editLaneModal">✕</button></div>
-  <label>Destination</label><input type="text" id="elDest">
-  <label>Route stops (comma separated)</label><input type="text" id="elRoute">
-  <label>Seats still available</label>
-  <div class="seat-selector" id="elSeatSelector">
-    <button class="seat-btn" data-seats="40"><span class="num">40</span><span class="lbl">Bus</span></button>
-    <button class="seat-btn" data-seats="4"><span class="num">4</span><span class="lbl">Car</span></button>
-    <button class="seat-btn" data-seats="3"><span class="num">3</span><span class="lbl">Auto</span></button>
-    <button class="seat-btn" data-seats="2"><span class="num">2</span><span class="lbl">Shared</span></button>
-    <button class="seat-btn" data-seats="1"><span class="num">1</span><span class="lbl">Single</span></button>
-    <button class="seat-btn" data-seats="0"><span class="num">0</span><span class="lbl">Full</span></button>
-  </div>
-  <label>Fare (₹)</label><input type="number" id="elFare" min="0">
-  <button class="btn-primary" id="editLaneConfirm">Save changes</button>
-  <button id="editLaneDelete" style="margin-top:8px;width:100%;padding:14px;border-radius:12px;background:var(--coral-dim);color:var(--coral);border:1px solid var(--coral);font-weight:700">Delete this lane</button>
-</div></div>
+<div class="modal-overlay" id="chatModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(17,24,39,0.4);z-index:1000;align-items:flex-end;justify-content:center"><div class="modal" style="background:#fff;border-radius:24px 24px 0 0;padding:20px;width:100%;max-width:480px;height:82vh;display:flex;flex-direction:column"><div style="display:flex;justify-content:space-between;margin-bottom:14px"><div><div id="chatName" style="font-weight:700">Lane chat</div><div id="chatStatus" style="font-size:0.7rem;color:#0D9488">Connecting...</div></div><button class="modal-close" data-close="#chatModal" style="width:34px;height:34px;border-radius:50%;background:#F1F3F6;border:1px solid #E5E7EB">X</button></div><div id="chatMessages" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:12px 0"></div><div style="display:flex;gap:8px"><input type="text" id="chatInput" placeholder="Type a message..." style="flex:1;padding:12px 18px;border-radius:24px;background:#F8F9FB;border:1.5px solid #E5E7EB"><button id="chatSend" style="width:44px;height:44px;border-radius:50%;background:#0D9488;color:#fff;border:none">Send</button></div></div></div>
 
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- REQUEST MODAL                                              -->
-<!-- ════════════════════════════════════════════════════════════ -->
-<div class="modal-overlay" id="requestModal"><div class="modal">
-  <div class="modal-head"><h3>Request a seat</h3><button class="modal-close" data-close="#requestModal">✕</button></div>
-  <p id="reqInfo" style="color:var(--text-2);font-size:.85rem;margin-bottom:16px"></p>
-  <label>Your message (optional)</label>
-  <textarea id="reqMsg" placeholder="Hi! I'm at the Main Gate, can you wait 2 minutes?"></textarea>
-  <button class="btn-primary" id="reqConfirm">Send request</button>
-</div></div>
+<div class="modal-overlay" id="hiveComposeModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(17,24,39,0.4);z-index:1000;align-items:flex-end;justify-content:center"><div class="modal" style="background:#fff;border-radius:24px 24px 0 0;padding:20px;width:100%;max-width:480px"><div class="modal-head" style="display:flex;justify-content:space-between;margin-bottom:18px"><h3 style="margin:0">New post</h3><button class="modal-close" data-close="#hiveComposeModal" style="width:34px;height:34px;border-radius:50%;background:#F1F3F6;border:1px solid #E5E7EB">X</button></div><input type="text" id="hiveHeading" placeholder="Headline" style="width:100%;padding:12px;border-radius:12px;background:#F8F9FB;border:1.5px solid #E5E7EB;margin-bottom:10px;box-sizing:border-box"><textarea id="hiveBody" placeholder="Body" rows="6" style="width:100%;padding:12px;border-radius:12px;background:#F8F9FB;border:1.5px solid #E5E7EB;margin-bottom:10px;box-sizing:border-box"></textarea><input type="text" id="hiveTags" placeholder="tags, comma, separated" style="width:100%;padding:12px;border-radius:12px;background:#F8F9FB;border:1.5px solid #E5E7EB;margin-bottom:14px;box-sizing:border-box"><button class="btn-primary" id="hiveComposeSubmit" style="width:100%;padding:14px;border-radius:12px;background:#0D9488;color:#fff;font-weight:700;border:none">Post to Hive</button></div></div>
 
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- CHAT MODAL                                                 -->
-<!-- ════════════════════════════════════════════════════════════ -->
-<div class="modal-overlay" id="chatModal"><div class="modal" style="height:82vh;display:flex;flex-direction:column">
-  <div class="chat-header">
-    <div class="ch-avatar" id="chatAvatar">?</div>
-    <div class="ch-info">
-      <div class="ch-name" id="chatName">Lane chat</div>
-      <div class="ch-status" id="chatStatusWrap"><span class="live-dot"></span><span id="chatStatus">Connecting…</span></div>
-    </div>
-    <button class="modal-close" data-close="#chatModal">✕</button>
-  </div>
-  <div class="chat-messages" id="chatMessages"></div>
-  <div class="chat-input-row">
-    <input type="text" id="chatInput" placeholder="Type a message…" autocomplete="off">
-    <button class="send-btn" id="chatSend">➤</button>
-  </div>
-</div></div>
+<div class="modal-overlay" id="authModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(17,24,39,0.4);z-index:1000;align-items:flex-end;justify-content:center"><div class="modal" style="background:#fff;border-radius:24px 24px 0 0;padding:20px;width:100%;max-width:480px"><div class="modal-head" style="display:flex;justify-content:space-between;margin-bottom:18px"><h3 id="authTitle" style="margin:0">Sign in</h3><button class="modal-close" id="authClose" style="width:34px;height:34px;border-radius:50%;background:#F1F3F6;border:1px solid #E5E7EB">X</button></div><div id="authStep1"><input type="tel" id="authPhone" placeholder="10-digit phone" maxlength="10" style="width:100%;padding:12px;border-radius:12px;background:#F8F9FB;border:1.5px solid #E5E7EB;margin-bottom:10px;box-sizing:border-box"><input type="email" id="authEmail" placeholder="you@example.com" style="width:100%;padding:12px;border-radius:12px;background:#F8F9FB;border:1.5px solid #E5E7EB;margin-bottom:14px;box-sizing:border-box"><button id="authSendOtp" style="width:100%;padding:14px;border-radius:12px;background:#0D9488;color:#fff;font-weight:700;border:none">Send code</button></div><div id="authStep2" style="display:none"><input type="text" id="authCode" placeholder="6-digit code" maxlength="6" style="width:100%;padding:12px;border-radius:12px;background:#F8F9FB;border:1.5px solid #E5E7EB;margin-bottom:14px;box-sizing:border-box"><button id="authVerifyOtp" style="width:100%;padding:14px;border-radius:12px;background:#0D9488;color:#fff;font-weight:700;border:none">Verify</button></div><div id="authStep3" style="display:none"><input type="text" id="authName" placeholder="Your name" style="width:100%;padding:12px;border-radius:12px;background:#F8F9FB;border:1.5px solid #E5E7EB;margin-bottom:10px;box-sizing:border-box"><input type="text" id="authUsername" placeholder="username" style="width:100%;padding:12px;border-radius:12px;background:#F8F9FB;border:1.5px solid #E5E7EB;margin-bottom:14px;box-sizing:border-box"><button id="authConfirm" style="width:100%;padding:14px;border-radius:12px;background:#0D9488;color:#fff;font-weight:700;border:none">Create account</button></div></div></div>
 
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- HIVE COMPOSE MODAL                                         -->
-<!-- ════════════════════════════════════════════════════════════ -->
-<div class="modal-overlay" id="hiveComposeModal"><div class="modal">
-  <div class="modal-head"><h3>New post</h3><button class="modal-close" data-close="#hiveComposeModal">✕</button></div>
-  <label>Heading</label>
-  <input type="text" id="hiveHeading" placeholder="A short headline (optional)" maxlength="80">
-  <label>Body</label>
-  <textarea id="hiveBody" placeholder="What do you want to share?" rows="6" maxlength="2000"></textarea>
-  <label>Tags (comma separated, optional)</label>
-  <input type="text" id="hiveTags" placeholder="traffic, cricket, route12" autocomplete="off">
-  <button class="btn-primary" id="hiveComposeSubmit" style="margin-top:12px">Post to Hive</button>
-  <button class="btn-secondary" id="hiveComposeCancel" style="margin-top:8px">Cancel</button>
-</div></div>
+<div class="modal-overlay" id="settingsModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(17,24,39,0.4);z-index:1000;align-items:flex-end;justify-content:center"><div class="modal" style="background:#fff;border-radius:24px 24px 0 0;padding:20px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto"><div class="modal-head" style="display:flex;justify-content:space-between;margin-bottom:18px"><h3 style="margin:0">Settings</h3><button class="modal-close" data-close="#settingsModal" style="width:34px;height:34px;border-radius:50%;background:#F1F3F6;border:1px solid #E5E7EB">X</button></div><div style="padding:16px 0;border-bottom:1px solid #E5E7EB"><div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:#9CA3AF;margin-bottom:12px">Account</div><button id="authOpenBtn" style="padding:10px 16px;border-radius:10px;background:#0D9488;color:#fff;border:none;font-weight:700;margin-right:8px">Sign in</button><button id="authLogoutBtn" style="padding:10px 16px;border-radius:10px;background:#FEE2E2;color:#DC2626;border:1px solid #DC2626;font-weight:700">Sign out</button></div><div style="padding:16px 0;border-bottom:1px solid #E5E7EB"><div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:#9CA3AF;margin-bottom:12px">Profile</div><input type="text" id="setName" placeholder="Your name" style="width:100%;padding:12px;border-radius:12px;background:#F8F9FB;border:1.5px solid #E5E7EB;margin-bottom:8px;box-sizing:border-box"><input type="text" id="setVehicle" placeholder="Vehicle number" style="width:100%;padding:12px;border-radius:12px;background:#F8F9FB;border:1.5px solid #E5E7EB;box-sizing:border-box"></div><div style="padding:16px 0"><div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:#9CA3AF;margin-bottom:12px">Data</div><button id="setClearLanes" style="padding:10px 16px;border-radius:10px;background:#FEE2E2;color:#DC2626;border:1px solid #DC2626;font-weight:700;margin-right:8px">Clear lanes</button><button id="setResetAll" style="padding:10px 16px;border-radius:10px;background:#FEE2E2;color:#DC2626;border:1px solid #DC2626;font-weight:700">Reset all</button></div><button id="settingsSave" style="width:100%;padding:14px;border-radius:12px;background:#0D9488;color:#fff;font-weight:700;border:none">Save and close</button></div></div>
 
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- SETTINGS MODAL                                             -->
-<!-- ════════════════════════════════════════════════════════════ -->
-<div class="modal-overlay" id="settingsModal"><div class="modal" style="max-height:90vh">
-  <div class="modal-head"><h3>Settings</h3><button class="modal-close" data-close="#settingsModal">✕</button></div>
+<div class="toast" id="toast" style="position:fixed;bottom:160px;left:50%;transform:translateX(-50%) translateY(120px);background:#111827;color:#fff;padding:12px 22px;border-radius:30px;font-size:0.82rem;font-weight:600;opacity:0;transition:transform 0.3s,opacity 0.2s;z-index:2000;pointer-events:none;max-width:90%"></div>
 
-  <div class="settings-section">
-    <div class="settings-label">Account</div>
-    <div class="settings-row"><span>Sign in with OTP</span><button class="btn-sm-danger" id="authOpenBtn" style="background:var(--teal);color:#fff;border-color:var(--teal)">Sign in</button></div>
-    <div class="settings-row"><span>Sign out</span><button class="btn-sm-danger" id="authLogoutBtn">Sign out</button></div>
-  </div>
-
-  <div class="settings-section">
-    <div class="settings-label">Profile</div>
-    <input type="text" id="setName" placeholder="Your display name">
-    <div class="vehicle-input-wrap" style="margin-top:8px">
-      <input type="text" id="setVehicle" placeholder="Vehicle number" maxlength="15" autocapitalize="characters">
-    </div>
-  </div>
-
-  <div class="settings-section">
-    <div class="settings-label">Appearance</div>
-    <div class="settings-row">
-      <span>Theme</span>
-      <div class="segmented" id="setTheme">
-        <button data-value="light" class="active">Light</button>
-        <button data-value="dark">Dark</button>
-      </div>
-    </div>
-    <div class="settings-row">
-      <span>Map style</span>
-      <div class="segmented" id="setMapStyle">
-        <button data-value="bright" class="active">Bright</button>
-        <button data-value="dark">Dark</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="settings-section">
-    <div class="settings-label">Notifications</div>
-    <div class="settings-row"><span>Chat messages</span><label class="switch"><input type="checkbox" id="setNotifChat" checked><span></span></label></div>
-    <div class="settings-row"><span>Seat requests</span><label class="switch"><input type="checkbox" id="setNotifSeats" checked><span></span></label></div>
-  </div>
-
-  <div class="settings-section">
-    <div class="settings-label">Privacy</div>
-    <div class="settings-row"><span>Share exact GPS with peers</span><label class="switch"><input type="checkbox" id="setShareGps" checked><span></span></label></div>
-    <div class="settings-row"><span>Visible in local mesh</span><label class="switch"><input type="checkbox" id="setVisible" checked><span></span></label></div>
-    <div class="settings-row"><span>Ghost mode (hide from map)</span><label class="switch"><input type="checkbox" id="setGhost"><span></span></label></div>
-    <div class="settings-row"><span>Show my plate to other drivers</span><label class="switch"><input type="checkbox" id="setShowPlate" checked><span></span></label></div>
-    <div class="settings-row"><span>Share UPI QR for payments</span><label class="switch"><input type="checkbox" id="setShareUpi" checked><span></span></label></div>
-  </div>
-
-  <div class="settings-section">
-    <div class="settings-label">Universal DB</div>
-    <div class="settings-row"><span>Cloud sync</span><label class="switch"><input type="checkbox" id="setCloudSync"><span></span></label></div>
-    <div class="cloud-status" id="cloudStatus">Not connected</div>
-    <button class="btn-secondary" id="cloudTest" style="margin-top:8px">Test connection</button>
-    <div id="devModeBlock" style="display:none;margin-top:16px">
-      <div class="settings-label" style="margin-top:8px">Developer · cloud endpoint</div>
-      <input type="text" id="setCloudUrl" placeholder="Apps Script URL">
-      <input type="text" id="setCloudKey" placeholder="Secret key">
-      <button class="btn-secondary" id="cloudSaveDev" style="margin-top:8px">Save endpoint</button>
-    </div>
-  </div>
-
-  <div class="settings-section">
-    <div class="settings-label">Data</div>
-    <div class="settings-row"><span>Clear my published lanes</span><button class="btn-sm-danger" id="setClearLanes">Clear</button></div>
-    <div class="settings-row"><span>Reset all data</span><button class="btn-sm-danger" id="setResetAll">Reset</button></div>
-  </div>
-
-  <div class="settings-section">
-    <div class="settings-label">About</div>
-    <p style="font-size:0.78rem;color:var(--text-2);line-height:1.6">Steeradar v6 · Vanilla JS · MIT License<br>Made by <a href="https://github.com/suryasticsai" target="_blank">@suryasticsai</a></p>
-    <p id="versionTap" style="font-size:0.7rem;color:var(--text-3);margin-top:8px;user-select:none;cursor:pointer">v6.0 — <span id="devModeHint">tap 5 times for diagnostics</span></p>
-  </div>
-
-  <button class="btn-primary" id="settingsSave">Save &amp; close</button>
-</div></div>
-
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- POST DETAIL MODAL                                          -->
-<!-- ════════════════════════════════════════════════════════════ -->
-<div class="modal-overlay" id="postDetailModal"><div class="modal">
-  <div class="modal-head"><h3 style="opacity:0;height:0;margin:0">Post</h3><button class="modal-close" data-close="#postDetailModal">✕</button></div>
-  <div class="post-detail" id="postDetailContent"></div>
-</div></div>
-
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- AUTH MODAL                                                 -->
-<!-- ════════════════════════════════════════════════════════════ -->
-<div class="modal-overlay" id="authModal"><div class="modal">
-  <div class="modal-head"><h3 id="authTitle">Create your account</h3><button class="modal-close" id="authClose">✕</button></div>
-  <div id="authStep1">
-    <label>Phone number</label>
-    <input type="tel" id="authPhone" placeholder="10-digit mobile" maxlength="10" inputmode="numeric" autocomplete="tel-national">
-    <label>Email</label>
-    <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email">
-    <button class="btn-primary" id="authSendOtp" style="margin-top:8px">Send code</button>
-  </div>
-  <div id="authStep2" style="display:none">
-    <label>Verification code</label>
-    <input type="text" id="authCode" placeholder="6-digit code" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
-    <button class="btn-primary" id="authVerifyOtp" style="margin-top:8px">Verify</button>
-  </div>
-  <div id="authStep3" style="display:none">
-    <label>Your name</label>
-    <input type="text" id="authName" placeholder="e.g. Sai Varakala" autocomplete="name">
-    <label>Username</label>
-    <input type="text" id="authUsername" placeholder="e.g. sai_varakala" autocapitalize="none" autocomplete="username">
-    <button class="btn-primary" id="authConfirm" style="margin-top:8px">Create account</button>
-  </div>
-</div></div>
-
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- LOG VIEWER MODAL                                           -->
-<!-- ════════════════════════════════════════════════════════════ -->
-<div class="modal-overlay" id="logModal"><div class="modal" style="height:85vh;display:flex;flex-direction:column">
-  <div class="modal-head"><h3>Diagnostics log</h3><button class="modal-close" data-close="#logModal">✕</button></div>
-  <div class="log-actions">
-    <button class="btn-secondary" id="logCopy" style="flex:1">📋 Copy</button>
-    <button class="btn-secondary" id="logClear" style="flex:1">🗑 Clear</button>
-    <button class="btn-secondary" id="logRefresh" style="flex:1">↻ Refresh</button>
-  </div>
-  <div class="log-content" id="logContent"><div class="log-empty">No logs yet.</div></div>
-</div></div>
-
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- CUSTOM DIALOG                                              -->
-<!-- ════════════════════════════════════════════════════════════ -->
-<div class="dialog-overlay" id="dialogOverlay"><div class="dialog">
-  <h3 id="dialogTitle">Confirm</h3>
-  <p id="dialogMsg"></p>
-  <input type="text" id="dialogInput" style="display:none">
-  <div class="dialog-actions">
-    <button class="btn-cancel" id="dialogCancel">Cancel</button>
-    <button class="btn-ok" id="dialogOk">OK</button>
-  </div>
-</div></div>
-
-<div class="toast" id="toast"></div>
-
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- CDN LIBRARIES                                              -->
-<!-- ════════════════════════════════════════════════════════════ -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.22/leaflet-maplibre-gl.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- CONFIG — MUST load before modules                          -->
-<!-- ════════════════════════════════════════════════════════════ -->
 <script src="./config.js"></script>
 
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- MODULAR BOOT — ONLY this, no legacy app.js                 -->
-<!-- ════════════════════════════════════════════════════════════ -->
-<script type="module" src="./js/app.js"></script>
+<!-- INLINE BOOT - runs before modules, guarantees gate is interactive -->
+<script>
+(function() {
+  console.log('[Steeradar] Inline boot starting');
 
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- DEBUG BRIDGE (optional, harmless)                          -->
-<!-- ════════════════════════════════════════════════════════════ -->
-<script type="module">
-  try {
-    const [{ api }, { state, storage, session, showToast }, { setupPhotoUploads }, { lanes }, { chat }, { hive }, { presence }, { logger }] = await Promise.all([
-      import('./js/api.js'),
-      import('./js/store.js'),
-      import('./js/photos.js'),
-      import('./js/lanes.js'),
-      import('./js/chat.js'),
-      import('./js/hive.js'),
-      import('./js/presence.js'),
-      import('./js/logger.js'),
-    ]);
+  var vehicleInput = document.getElementById('onboardVehicle');
+  var onboardBtn = document.getElementById('onboardBtn');
+  var gate = document.getElementById('onboardGate');
+  var photosStep = document.getElementById('onboardPhotos');
+  var appEl = document.getElementById('app');
 
-    window.Steeradar = {
-      api, state, storage, session, showToast,
-      setupPhotoUploads,
-      lanes, chat, hive, presence, logger,
-      broadcastToAllPeers: presence.broadcast,
-      startRouteTracking: presence.startTracking,
-      openChatForLane: chat.openLane,
-    };
-
-    console.log('%c Steeradar modules ready ', 'background:#0D9488;color:#fff;font-weight:700;padding:4px 8px;border-radius:4px');
-  } catch (err) {
-    console.error('Debug bridge failed:', err);
-    window.__steeradarErrors?.push?.('Debug bridge: ' + err.message);
+  if (!vehicleInput || !onboardBtn) {
+    console.error('[Steeradar] Gate elements missing');
+    return;
   }
+
+  // Vehicle validation
+  vehicleInput.addEventListener('input', function() {
+    this.value = this.value.toUpperCase();
+    var valid = /^[A-Z0-9]{4,15}$/.test(this.value.replace(/[\s-]/g, ''));
+    onboardBtn.disabled = !valid;
+  });
+
+  vehicleInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !onboardBtn.disabled) onboardBtn.click();
+  });
+
+  // Continue button - handles both fresh and existing users
+  onboardBtn.addEventListener('click', function() {
+    var v = vehicleInput.value.trim().replace(/[\s-]/g, '').toUpperCase();
+    if (!/^[A-Z0-9]{4,15}$/.test(v)) {
+      alert('Please enter a valid vehicle number');
+      return;
+    }
+    localStorage.setItem('steeradar-vehicle', v);
+
+    // Try to advance to photos step
+    if (photosStep) {
+      gate.classList.add('gate-hidden');
+      gate.style.display = 'none';
+      photosStep.style.display = 'flex';
+      window.__pendingVehicle = v;
+      wirePhotoStep();
+    } else {
+      // No photos step - go straight to app
+      startApp();
+    }
+  });
+
+  function wirePhotoStep() {
+    var doneBtn = document.getElementById('onboardPhotosDone');
+    var skipBtn = document.getElementById('onboardPhotosSkip');
+    var anyUploaded = false;
+
+    // Simple photo handlers
+    document.querySelectorAll('#onboardPhotos .photo-card').forEach(function(card) {
+      var input = card.querySelector('input[type="file"]');
+      var preview = card.querySelector('.photo-preview');
+      if (!input || !preview) return;
+
+      input.addEventListener('change', function() {
+        var file = this.files[0];
+        if (!file) return;
+        preview.innerHTML = 'Uploading...';
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+          preview.innerHTML = '<img src="' + ev.target.result + '" style="width:100%;height:100%;object-fit:cover">';
+          anyUploaded = true;
+          if (doneBtn) doneBtn.disabled = false;
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+
+    if (doneBtn) doneBtn.addEventListener('click', function() { startApp(); });
+    if (skipBtn) skipBtn.addEventListener('click', function() { startApp(); });
+  }
+
+  function startApp() {
+    var v = localStorage.getItem('steeradar-vehicle');
+    if (!v) return;
+    console.log('[Steeradar] Unlocking app for vehicle:', v);
+
+    // Hide all onboarding
+    gate.classList.add('gate-hidden');
+    gate.style.display = 'none';
+    if (photosStep) photosStep.style.display = 'none';
+
+    // Show app
+    if (appEl) {
+      appEl.style.display = 'flex';
+      appEl.style.flexDirection = 'column';
+    }
+
+    // Update header
+    var badge = document.getElementById('vehicleBadgeText');
+    if (badge) badge.textContent = v;
+    var avatar = document.getElementById('avatarBtn');
+    var name = localStorage.getItem('steeradar-name') || '';
+    if (avatar) avatar.textContent = (name || '?').charAt(0).toUpperCase();
+
+    // Hand off to modules for the rest
+    window.dispatchEvent(new CustomEvent('steeradar:unlock', { detail: { vehicle: v } }));
+  }
+
+  // Auto-unlock if vehicle already saved
+  var saved = localStorage.getItem('steeradar-vehicle');
+  if (saved && /^[A-Z0-9]{4,15}$/.test(saved)) {
+    console.log('[Steeradar] Already onboarded, skipping gate');
+    startApp();
+  } else {
+    console.log('[Steeradar] Showing gate, waiting for input');
+  }
+
+  // Expose for debugging
+  window.__steeradarInline = { startApp: startApp };
+})();
 </script>
 
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- BOOT WATCHDOG — shows error overlay if nothing boots       -->
-<!-- ════════════════════════════════════════════════════════════ -->
+<!-- MODULE APP - enhances after boot -->
+<script type="module" src="./js/app.js"></script>
+
+<!-- Boot watchdog -->
 <script>
-  setTimeout(() => {
-    const hasBooted = window.Steeradar || window.SteeradarApp;
-    const gateHidden = document.getElementById('onboardGate')?.style.display === 'none';
-    const appVisible = document.getElementById('app')?.offsetHeight > 0;
-    if (!hasBooted && !gateHidden && !appVisible) {
-      const errors = window.__steeradarErrors || [];
-      showBootError(
-        errors.length
-          ? errors.join('\n\n────────\n\n')
-          : 'No module loaded within 4 seconds. Check the network tab — one or more /js/*.js files may be failing to load.'
-      );
-    }
-  }, 4000);
+setTimeout(function() {
+  var gate = document.getElementById('onboardGate');
+  var appEl = document.getElementById('app');
+  var gateVisible = gate && gate.style.display !== 'none' && !gate.classList.contains('gate-hidden');
+  var appVisible = appEl && appEl.style.display !== 'none' && appEl.offsetHeight > 0;
+  if (!gateVisible && !appVisible) {
+    window.__showErr && window.__showErr('Neither gate nor app is visible after 5 seconds.');
+  }
+}, 5000);
 </script>
 
 </body>
