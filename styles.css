@@ -958,3 +958,39 @@ header {
   .view-header h2 { font-size: 1.5rem; }
   .hive-header h1 { font-size: 1.7rem; }
 }
+
+/* ============================================================
+   BULLETPROOF OVERRIDES - v6 fix
+   ============================================================ */
+
+/* View switching - only one active at a time */
+.view { display: none !important; }
+.view.active { display: block !important; }
+#pulseView.active { display: block !important; }
+
+/* Modal visibility */
+.modal-overlay { display: none !important; }
+.modal-overlay.active { display: flex !important; }
+
+/* Toast */
+.toast.show {
+  transform: translateX(-50%) translateY(0) !important;
+  opacity: 1 !important;
+}
+
+/* Map lane card */
+.map-lane-card.show { transform: translateY(0) !important; }
+
+/* Nav active state */
+.nav-item.active { color: #0D9488 !important; }
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 2.5px;
+  border-radius: 2px;
+  background: #0D9488;
+}
