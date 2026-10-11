@@ -1,4 +1,4 @@
-// js/hive.js — Community board with edit + delete.
+// js/hive.js - Community board with edit + delete
 
 import { api } from './api.js';
 import {
@@ -13,12 +13,16 @@ let likedPosts = new Set(storage.get('liked', []));
 let pendingLikes = new Set();
 let _editingPost = null;
 
-// ─── PUBLIC: BOOT ───
+// ============================================================
+//  PUBLIC: BOOT
+// ============================================================
 export function initHive() {
   wireComposeModal();
 }
 
-// ─── LOAD & SAVE ───
+// ============================================================
+//  LOAD & SAVE
+// ============================================================
 export function loadHiveFromStorage() {
   loadHive();
   dedupeHive();
@@ -28,7 +32,9 @@ function saveLiked() {
   storage.set('liked', [...likedPosts]);
 }
 
-// ─── CLOUD SYNC ───
+// ============================================================
+//  CLOUD SYNC
+// ============================================================
 export async function syncHiveFromCloud() {
   const list = await api.listHive();
   if (!Array.isArray(list)) return;
@@ -61,7 +67,9 @@ export async function syncHiveFromCloud() {
   renderHive();
 }
 
-// ─── RENDER ───
+// ============================================================
+//  RENDER
+// ============================================================
 export function renderHive() {
   dedupeHive();
   renderStories();
@@ -77,40 +85,38 @@ export function renderHive() {
   if (!feed) return;
 
   if (!state.hivePosts.length) {
-    feed.innerHTML = `
-      <div class="empty">
-        <div class="icon">🐝</div>
-        <p>No posts yet. Tap <b>New post</b> to share something with your community.</p>
-      </div>`;
+    feed.innerHTML =
+      '<div class="empty">' +
+        '<div class="icon">🐝</div>' +
+        '<p>No posts yet. Tap <b>New post</b> to share something with your community.</p>' +
+      '</div>';
     return;
   }
 
   feed.innerHTML = state.hivePosts.slice().reverse().map(post => {
     const liked = likedPosts.has(post.id);
-    return `
-      <div class="post-card" data-post-id="${esc(post.id)}">
-        <div class="post-head">
-          <div class="post-avatar">${esc(post.avatar)}</div>
-          <div class="post-meta">
-            <div class="post-name">${esc(post.name)}</div>
-            <div class="post-time">${esc(timeAgo(post.ts, post.time))}</div>
-          </div>
-        </div>
-        ${post.title ? `<div class="post-title">${esc(post.title)}</div>` : ''}
-        <div class="post-body">${esc(post.text)}</div>
-        ${post.tags && post.tags.length
-          ? `<div class="post-tags">${post.tags.map(t => `<span class="post-tag">${esc(t)}</span>`).join('')}</div>`
-          : ''}
-        <div class="post-actions">
-          <button class="pa-btn ${liked ? 'liked' : ''}" data-act="like" data-id="${esc(post.id)}">
-            <svg viewBox="0 0 24 24" fill="${liked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-            </svg>
-            <span class="cnt">${post.likes || 0}</span>
-          </button>
-        </div>
-      </div>
-    `;
+    return (
+      '<div class="post-card" data-post-id="' + esc(post.id) + '">' +
+        '<div class="post-head">' +
+          '<div class="post-avatar">' + esc(post.avatar) + '</div>' +
+          '<div class="post-meta">' +
+            '<div class="post-name">' + esc(post.name) + '</div>' +
+            '<div class="post-time">' + esc(timeAgo(post.ts, post.time)) + '</div>' +
+          '</div>' +
+        '</div>' +
+        (post.title ? '<div class="post-title">' + esc(post.title) + '</div>' : '') +
+        '<div class="post-body">' + esc(post.text) + '</div>' +
+        (post.tags && post.tags.length
+          ? '<div class="post-tags">' + post.tags.map(t => '<span class="post-tag">' + esc(t) + '</span>').join('') + '</div>'
+          : '') +
+        '<div class="post-actions">' +
+          '<button class="pa-btn ' + (liked ? 'liked' : '') + '" data-act="like" data-id="' + esc(post.id) + '">' +
+            '<svg viewBox="0 0 24 24" fill="' + (liked ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>' +
+            '<span class="cnt">' + (post.likes || 0) + '</span>' +
+          '</button>' +
+        '</div>' +
+      '</div>'
+    );
   }).join('');
 
   feed.querySelectorAll('.post-card').forEach(card => {
@@ -132,30 +138,32 @@ export function renderHive() {
   });
 }
 
-// ─── STORIES ───
+// ============================================================
+//  STORIES
+// ============================================================
 function renderStories() {
   const row = document.getElementById('storyRow');
   if (!row) return;
 
   const seen = new Set();
   const driverStories = [];
-  for (const lane of state.lanes) {
+  for (const lane of (state.lanes || [])) {
     if (seen.has(lane.driver)) continue;
     seen.add(lane.driver);
     driverStories.push({ label: lane.driver.split(' ')[0], avatar: lane.avatar, driver: lane.driver });
     if (driverStories.length >= 5) break;
   }
 
-  const stories = [{ label: 'Add', avatar: '＋', add: true }, ...driverStories];
+  const stories = [{ label: 'Add', avatar: '＋', add: true }].concat(driverStories);
 
-  row.innerHTML = stories.map(s => `
-    <div class="story" ${s.driver ? `data-driver="${esc(s.driver)}"` : ''}>
-      <div class="story-ring">
-        <div class="story-inner ${s.add ? 'add' : ''}">${esc(s.avatar)}</div>
-      </div>
-      <div class="story-name">${esc(s.label)}</div>
-    </div>
-  `).join('');
+  row.innerHTML = stories.map(s =>
+    '<div class="story" ' + (s.driver ? 'data-driver="' + esc(s.driver) + '"' : '') + '>' +
+      '<div class="story-ring">' +
+        '<div class="story-inner ' + (s.add ? 'add' : '') + '">' + esc(s.avatar) + '</div>' +
+      '</div>' +
+      '<div class="story-name">' + esc(s.label) + '</div>' +
+    '</div>'
+  ).join('');
 
   row.querySelectorAll('[data-driver]').forEach(el => {
     el.addEventListener('click', () => {
@@ -170,17 +178,21 @@ function renderStories() {
   if (addStory) addStory.addEventListener('click', () => openComposeModal());
 }
 
-// ─── GREETING ───
+// ============================================================
+//  GREETING
+// ============================================================
 function renderGreeting() {
   const el = document.getElementById('greetingText');
   if (!el) return;
   const hour = new Date().getHours();
   const g = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const firstName = (state.userName || 'friend').split(' ')[0];
-  el.textContent = `${g}, ${firstName} 👋`;
+  el.textContent = g + ', ' + firstName + ' 👋';
 }
 
-// ─── LIKE ───
+// ============================================================
+//  LIKE
+// ============================================================
 function toggleLike(post) {
   const id = post.id;
   const delta = likedPosts.has(id) ? -1 : 1;
@@ -208,7 +220,9 @@ function toggleLike(post) {
     .finally(() => pendingLikes.delete(id));
 }
 
-// ─── POST DETAIL ───
+// ============================================================
+//  POST DETAIL
+// ============================================================
 export function showPostDetail(post) {
   const liked = likedPosts.has(post.id);
   const content = document.getElementById('postDetailContent');
@@ -216,31 +230,29 @@ export function showPostDetail(post) {
 
   const isMine = isMyPost(post);
 
-  content.innerHTML = `
-    <div class="pd-head">
-      <div class="pd-avatar">${esc(post.avatar)}</div>
-      <div>
-        <div class="pd-name">${esc(post.name)}</div>
-        <div class="pd-time">${esc(timeAgo(post.ts, post.time))}</div>
-      </div>
-    </div>
-    ${post.title ? `<h2>${esc(post.title)}</h2>` : ''}
-    <div class="pd-body">${esc(post.text).replace(/\n/g, '<br>')}</div>
-    ${post.tags && post.tags.length
-      ? `<div class="post-tags" style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">${post.tags.map(t => `<span class="post-tag">${esc(t)}</span>`).join('')}</div>`
-      : ''}
-    <div class="pd-actions">
-      <button class="pa-btn ${liked ? 'liked' : ''}" id="pdLike"
-        style="display:flex;align-items:center;gap:6px;font-weight:600;color:${liked ? 'var(--coral)' : 'var(--text-2)'}">
-        <svg viewBox="0 0 24 24" fill="${liked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" width="18" height="18">
-          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-        </svg>
-        <span>${post.likes || 0}</span>
-      </button>
-      ${isMine ? '<button class="pd-edit-btn" id="pdEdit">✎ Edit</button>' : ''}
-      ${isMine ? '<button class="pd-edit-btn" id="pdDelete" style="color:var(--coral);border-color:var(--coral)">🗑 Delete</button>' : ''}
-    </div>
-  `;
+  content.innerHTML =
+    '<div class="pd-head">' +
+      '<div class="pd-avatar">' + esc(post.avatar) + '</div>' +
+      '<div>' +
+        '<div class="pd-name">' + esc(post.name) + '</div>' +
+        '<div class="pd-time">' + esc(timeAgo(post.ts, post.time)) + '</div>' +
+      '</div>' +
+    '</div>' +
+    (post.title ? '<h2>' + esc(post.title) + '</h2>' : '') +
+    '<div class="pd-body">' + esc(post.text).replace(/\n/g, '<br>') + '</div>' +
+    (post.tags && post.tags.length
+      ? '<div class="post-tags" style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">' +
+          post.tags.map(t => '<span class="post-tag">' + esc(t) + '</span>').join('') +
+        '</div>'
+      : '') +
+    '<div class="pd-actions">' +
+      '<button class="pa-btn ' + (liked ? 'liked' : '') + '" id="pdLike" style="display:flex;align-items:center;gap:6px;font-weight:600;color:' + (liked ? 'var(--coral)' : 'var(--text-2)') + '">' +
+        '<svg viewBox="0 0 24 24" fill="' + (liked ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>' +
+        '<span>' + (post.likes || 0) + '</span>' +
+      '</button>' +
+      (isMine ? '<button class="pd-edit-btn" id="pdEdit">✎ Edit</button>' : '') +
+      (isMine ? '<button class="pd-edit-btn" id="pdDelete" style="color:var(--coral);border-color:var(--coral)">🗑 Delete</button>' : '') +
+    '</div>';
 
   document.getElementById('pdLike').onclick = () => {
     toggleLike(post);
@@ -253,13 +265,13 @@ export function showPostDetail(post) {
 }
 
 function isMyPost(post) {
-  return post.vehicle === state.vehicle
-      && (post.phone ? post.phone === state.phone : post.name === state.userName);
+  return post.vehicle === state.vehicle &&
+    (post.phone ? post.phone === state.phone : post.name === state.userName);
 }
 
 function wireHiveEdit(post) {
   const edit = document.getElementById('pdEdit');
-  const del  = document.getElementById('pdDelete');
+  const del = document.getElementById('pdDelete');
 
   if (edit) edit.onclick = () => {
     document.getElementById('postDetailModal')?.classList.remove('active');
@@ -268,7 +280,7 @@ function wireHiveEdit(post) {
 
   if (del) del.onclick = async () => {
     if (!confirm('Delete this post?')) return;
-    try { await api.call('delete', { sheet: 'hive', id: post.id }); } catch {}
+    try { await api.call('delete', { sheet: 'hive', id: post.id }); } catch (e) {}
     state.hivePosts = state.hivePosts.filter(p => p.id !== post.id);
     saveHive();
     renderHive();
@@ -277,9 +289,9 @@ function wireHiveEdit(post) {
   };
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 //  COMPOSE MODAL
-// ═══════════════════════════════════════════════════════════════
+// ============================================================
 function wireComposeModal() {
   const cancel = document.getElementById('hiveComposeCancel');
   const submit = document.getElementById('hiveComposeSubmit');
@@ -304,21 +316,21 @@ function wireComposeModal() {
   }
 }
 
-export function openComposeModal(post = null) {
+export function openComposeModal(post) {
   const modal = document.getElementById('hiveComposeModal');
   if (!modal) { showToast('Compose modal missing'); return; }
 
-  _editingPost = post;
+  _editingPost = post || null;
 
   const headEl = document.querySelector('#hiveComposeModal .modal-head h3');
   if (headEl) headEl.textContent = post ? 'Edit post' : 'New post';
 
-  document.getElementById('hiveHeading').value = post?.title || '';
-  document.getElementById('hiveBody').value    = post?.text  || '';
-  document.getElementById('hiveTags').value    = post?.tags?.join(', ') || '';
+  document.getElementById('hiveHeading').value = (post && post.title) || '';
+  document.getElementById('hiveBody').value = (post && post.text) || '';
+  document.getElementById('hiveTags').value = (post && post.tags) ? post.tags.join(', ') : '';
 
   modal.classList.add('active');
-  setTimeout(() => document.getElementById('hiveHeading').focus(), 250);
+  setTimeout(() => document.getElementById('hiveHeading')?.focus(), 250);
 }
 
 function closeComposeModal() {
@@ -326,8 +338,8 @@ function closeComposeModal() {
 }
 
 async function handleComposeSubmit() {
-  const title   = document.getElementById('hiveHeading').value.trim();
-  const text    = document.getElementById('hiveBody').value.trim();
+  const title = document.getElementById('hiveHeading').value.trim();
+  const text = document.getElementById('hiveBody').value.trim();
   const tagsRaw = document.getElementById('hiveTags').value.trim();
 
   if (!title && !text) { showToast('Write something first', 'error'); return; }
@@ -344,7 +356,7 @@ async function handleComposeSubmit() {
     saveHive();
     try {
       await api.call('update', { sheet: 'hive', id: p.id, row: { title, text, tags: tags.join('|') } });
-    } catch {}
+    } catch (e) {}
     renderHive();
     showToast('Post updated', 'success');
   } else {
@@ -355,9 +367,12 @@ async function handleComposeSubmit() {
   _editingPost = null;
 }
 
-// ─── PUBLISH ───
-export async function publishPost(title, text, tags = []) {
+// ============================================================
+//  PUBLISH
+// ============================================================
+export async function publishPost(title, text, tags) {
   if (!text || !text.trim()) return;
+  if (!tags) tags = [];
 
   const post = {
     id: 'hive-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
@@ -366,7 +381,7 @@ export async function publishPost(title, text, tags = []) {
     avatar: (state.userName || 'DR').substring(0, 2).toUpperCase(),
     title: (title || '').trim(),
     text: text.trim(),
-    tags: tags || [],
+    tags: tags,
     time: 'just now',
     likes: 0,
     ts: Date.now(),
@@ -378,8 +393,8 @@ export async function publishPost(title, text, tags = []) {
   renderHive();
   showToast('Posted to Hive 🐝', 'success');
 
-  if (window.Steeradar?.broadcastToAllPeers) {
-    window.Steeradar.broadcastToAllPeers({ type: 'hive-post', post });
+  if (window.Steeradar && window.Steeradar.broadcastToAllPeers) {
+    window.Steeradar.broadcastToAllPeers({ type: 'hive-post', post: post });
   }
 
   const row = {
@@ -396,17 +411,21 @@ export async function publishPost(title, text, tags = []) {
     vehicle: state.vehicle,
   };
   const r = await api.insertHive(row);
-  if (!r) showToast('Saved locally — cloud: ' + (api.lastError || 'failed'), 'error');
+  if (!r) showToast('Saved locally - cloud: ' + (api.lastError || 'failed'), 'error');
 }
 
-// ─── UTILS ───
+// ============================================================
+//  UTILS
+// ============================================================
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
 }
 
-// ─── PUBLIC API ───
+// ============================================================
+//  PUBLIC API
+// ============================================================
 export const hive = {
   init: initHive,
   loadFromStorage: loadHiveFromStorage,
